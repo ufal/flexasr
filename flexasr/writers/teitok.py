@@ -26,6 +26,8 @@ class Encoding:
     """Per-project choices; the defaults are what the TEITOK spoken corpora use."""
 
     media_dir: str = "Audio"
+    media_url: Optional[str] = None           # explicit media url (e.g. "Audio/sub/x.wav"); else media_dir/name
+    conf: bool = True                         # word confidence (when the model gives one) as @conf on <tok>
     pause_long: float = 1.0                   # ≥ this: type="long", else "short"
     pauses: bool = True
     vocal: bool = True                        # fillers as <vocal>; False: plain <tok>
@@ -78,7 +80,8 @@ def build(doc: Doc, enc: Optional[Encoding] = None, text_id: Optional[str] = Non
         if bits:
             ET.SubElement(app, "desc").text = "; ".join(bits)
     rec = ET.SubElement(ET.SubElement(hdr, "recordingStmt"), "recording")
-    url = f"{enc.media_dir}/{Path(doc.audio.path).name}" if enc.media_dir else Path(doc.audio.path).name
+    url = enc.media_url or (f"{enc.media_dir}/{Path(doc.audio.path).name}" if enc.media_dir
+                            else Path(doc.audio.path).name)
     _set(ET.SubElement(rec, "media"), url=url, mimeType=_mime(doc.audio.path))
 
     text = _set(ET.SubElement(tei, "text"), id=text_id or stem)
@@ -112,15 +115,20 @@ def build(doc: Doc, enc: Optional[Encoding] = None, text_id: Optional[str] = Non
     return tei
 
 
+def _orig(w: Word) -> Optional[str]:
+    """The model's own spelling, when the encoding changed it (kept as an attribute)."""
+    return w.orig if w.orig and w.orig != w.text else None
+
+
 def _word(ue: ET.Element, w: Word, enc: Encoding, n: int) -> Optional[ET.Element]:
     if w.kind == "filler" and enc.vocal:
-        v = _set(ET.SubElement(ue, "vocal"), start=_t(w.start), end=_t(w.end))
+        v = _set(ET.SubElement(ue, "vocal"), start=_t(w.start), end=_t(w.end), orig=_orig(w))
         ET.SubElement(v, "desc").text = w.text
         return v
     if w.kind == "event":
         if not enc.events:
             return None
-        ev = _set(ET.SubElement(ue, enc.events), start=_t(w.start), end=_t(w.end))
+        ev = _set(ET.SubElement(ue, enc.events), start=_t(w.start), end=_t(w.end), orig=_orig(w))
         ET.SubElement(ev, "desc").text = w.text
         return ev
     parent = ue
@@ -129,8 +137,10 @@ def _word(ue: ET.Element, w: Word, enc: Encoding, n: int) -> Optional[ET.Element
     tok = _set(ET.SubElement(parent, "tok"), id=f"w-{n}", start=_t(w.start), end=_t(w.end))
     if parent is not ue:
         tok.set("form", "--")                     # drops out of the normalized text, as in TEITOK corpora
-    if w.orig and w.orig != w.text:
+    if _orig(w):
         tok.set("orig", w.orig)
+    if enc.conf and w.conf is not None:
+        tok.set("conf", f"{w.conf:.3f}")
     tok.text = w.text
     return parent if parent is not ue else tok
 

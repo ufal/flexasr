@@ -83,6 +83,7 @@ def main(argv=None):
     p = sub.add_parser("run", help="audio → TEITOK XML (or the intermediate JSON)")
     p.add_argument("audio")
     p.add_argument("-o", "--output", help="output file (.xml: TEITOK, .json: intermediate document)")
+    p.add_argument("--media-url", help="media url in the TEI header (default: Audio/<file name>)")
     _common(p)
 
     p = sub.add_parser("stage", help="run stages on a saved intermediate document")
@@ -94,6 +95,7 @@ def main(argv=None):
     p = sub.add_parser("write", help="intermediate JSON → TEITOK XML")
     p.add_argument("doc")
     p.add_argument("-o", "--output", required=True)
+    p.add_argument("--media-url", help="media url in the TEI header (default: Audio/<file name>)")
 
     sub.add_parser("info", help="hardware, and which providers can run here (and why not)")
 
@@ -106,6 +108,7 @@ def main(argv=None):
     p.add_argument("--task")
     p.add_argument("-l", "--lang")
     p.add_argument("--mode", choices=("clean", "verbatim"), default="clean")
+    p.add_argument("--json", action="store_true", help="machine-readable (entries, usability, choices)")
     p.add_argument("--allow-restricted", action="store_true")
 
     a = ap.parse_args(argv)
@@ -128,6 +131,12 @@ def main(argv=None):
             mark = "ok " if av.usable else "-- "
             where = f"on {av.device}" if av.usable else av.reason
             print(f"  {mark}{r.spec.name:16} {','.join(r.spec.tasks):12} {where}")
+        return 0
+
+    if a.cmd == "models" and a.json:
+        from .models_report import report
+
+        print(json.dumps(report(a.lang, a.mode, a.allow_restricted, a.task), ensure_ascii=False, indent=1))
         return 0
 
     if a.cmd == "models":
@@ -164,7 +173,7 @@ def main(argv=None):
 
     if a.cmd == "write":
         doc = Doc.from_json(Path(a.doc).read_text(encoding="utf-8"))
-        teitok.write(doc, a.output)
+        teitok.write(doc, a.output, teitok.Encoding(media_url=a.media_url))
         return 0
 
     s = _settings(a)
@@ -179,7 +188,7 @@ def main(argv=None):
     elif out.endswith(".json"):
         Path(out).write_text(doc.to_json(), encoding="utf-8")
     else:
-        teitok.write(doc, out)
+        teitok.write(doc, out, teitok.Encoding(media_url=getattr(a, "media_url", None)))
     return 0
 
 

@@ -2,7 +2,7 @@
 
 ``models_dir`` (``~/.flexasr/config.json`` or ``FLEXASR_MODELS``) redirects the download caches of the
 libraries the providers use — Hugging Face hub (faster-whisper, pyannote, transformers), torch hub
-(torchaudio / WhisperX alignment models) — to one place, e.g. a large external disk. It must be set up
+(torchaudio / WhisperX alignment models), CrisperWhisper's converted models — to one place, e.g. a large external disk. It must be set up
 before those libraries are imported: they read their cache location at import time.
 """
 
@@ -34,6 +34,7 @@ def setup(config: Optional[dict] = None) -> Optional[Path]:
     torch_home.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("HF_HUB_CACHE", str(hub))
     os.environ.setdefault("TORCH_HOME", str(torch_home))
+    os.environ.setdefault("CRISPERWHISPER_CACHE", str(d / "crisperwhisper"))
     if "huggingface_hub" in sys.modules:
         from huggingface_hub import constants
 

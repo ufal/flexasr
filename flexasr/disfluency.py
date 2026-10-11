@@ -30,6 +30,8 @@ FILLERS: dict[str, set[str]] = {
     "swe": {"eh", "öh", "hm", "mm"},
 }
 _GENERIC_FILLERS = {"hm", "hmm", "mm", "mhm"}
+# Filler codes models write in brackets whatever the language (CrisperWhisper: [UH], [UM]).
+_BRACKET_FILLERS = {"uh", "um", "uhm", "er", "erm", "eh", "ehm", "ah", "hm", "hmm", "mm", "mhm"}
 _EVENT = re.compile(r"^[\[\(<](.+?)[\]\)>]$")          # [laughter], (rires), <laugh>
 _TRUNC = re.compile(r"^(.*\w)[-–‐]$")                  # "dé-", "pro-" (not "-ci", not "c'est-à-dire")
 
@@ -51,7 +53,9 @@ def encode(doc: Doc, language: Optional[str] = None, pause_min: float = 0.3) -> 
                 continue
             m = _EVENT.match(w.text.strip())
             if m:
-                w.kind, w.orig, w.text = "event", w.text, m.group(1).strip()
+                inner = m.group(1).strip()
+                filler = _key(inner) in _BRACKET_FILLERS or _key(inner) in fillers
+                w.kind, w.orig, w.text = ("filler" if filler else "event"), w.text, (inner.lower() if filler else inner)
                 continue
             k = _key(w.text)
             if k in fillers:
