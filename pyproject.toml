@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flexasr"
+version = "0.2.0.dev0"
+description = "Modular ASR pipeline for TEITOK corpora: per-language routing, verbatim transcription, timed TEI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT (code only; models keep their own licences)" }
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+# Providers are optional: install what you need; `flexasr info` shows what is usable.
+whisper = ["faster-whisper>=1.1"]
+pyannote = ["pyannote.audio>=4.0"]
+whisperx = ["whisperx>=3.4"]
+audio = ["soundfile"]
+test = ["pytest"]
+
+[project.scripts]
+flexasr = "flexasr.cli:run_cli"
+
+[project.entry-points."flexasr.providers"]
+# external packages add providers here, e.g.  myprov = "mypkg.provider:MyProvider"
+
+[tool.setuptools.packages.find]
+include = ["flexasr*"]
+
+[tool.setuptools.package-data]
+flexasr = ["catalog/*.json"]

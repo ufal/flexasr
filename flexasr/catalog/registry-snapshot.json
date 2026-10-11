@@ -1,0 +1,93 @@
+{
+  "comment": "Snapshot of registries/asr from the shared models repository (offline fallback; regenerate with scripts/sync_registry_snapshot.py).",
+  "models": [
+    {
+      "task": "transcribe",
+      "provider": "faster-whisper",
+      "source": "hf:Systran/faster-whisper-large-v3",
+      "licence": "MIT",
+      "timestamps": "word",
+      "priority": 40,
+      "id": "faster-whisper-large-v3",
+      "note": "Whisper large-v3 (CTranslate2). Strong for big languages, ~99 languages; normalizes (drops fillers). CPU int8 works but is slow."
+    },
+    {
+      "task": "transcribe",
+      "provider": "faster-whisper",
+      "source": "hf:Systran/faster-whisper-small",
+      "licence": "MIT",
+      "timestamps": "word",
+      "priority": 10,
+      "id": "faster-whisper-small",
+      "note": "Small Whisper for quick runs and tests."
+    },
+    {
+      "task": "transcribe",
+      "provider": "faster-whisper",
+      "source": "hf:Systran/faster-whisper-tiny",
+      "licence": "MIT",
+      "timestamps": "word",
+      "priority": 1,
+      "id": "faster-whisper-tiny",
+      "note": "Tiny Whisper: smoke tests only."
+    },
+    {
+      "task": "transcribe",
+      "provider": "faster-whisper",
+      "source": "hf:nyrahealth/faster_CrisperWhisper",
+      "licence": "CC-BY-NC-4.0",
+      "restricted": [
+        "noncommercial"
+      ],
+      "languages": [
+        "eng",
+        "deu"
+      ],
+      "modes": [
+        "verbatim",
+        "clean"
+      ],
+      "timestamps": "word",
+      "priority": 60,
+      "id": "crisperwhisper-ct2",
+      "note": "CTranslate2 port of CrisperWhisper 1.x (English, German); verbatim. CrisperWhisper 2.0 (10 languages incl. French) needs a transformers provider (planned)."
+    },
+    {
+      "task": "diarize",
+      "provider": "pyannote",
+      "source": "hf:pyannote/speaker-diarization-community-1",
+      "licence": "CC-BY-4.0",
+      "gated": true,
+      "priority": 50,
+      "id": "pyannote-community-1",
+      "note": "pyannote.audio 4.x. Gated: accept the conditions on Hugging Face and provide a token (HF_TOKEN). Gives full (overlapping) and exclusive diarization."
+    },
+    {
+      "task": "diarize",
+      "provider": "speaker-onnx",
+      "source": "hf:Wespeaker/wespeaker-voxceleb-resnet34-LM",
+      "revision": "f0c48c298fd835726c27956a5d617bad7115627e",
+      "sha256": {
+        "voxceleb_resnet34_LM.onnx": "7bb2f06e9df17cdf1ef14ee8a15ab08ed28e8d0ef5054ee135741560df2ec068"
+      },
+      "licence": "CC-BY-4.0",
+      "licence_verified": true,
+      "priority": 40,
+      "options": {
+        "file": "voxceleb_resnet34_LM.onnx"
+      },
+      "licence_note": "model weights CC BY 4.0 (attribution: Wang et al., Wespeaker, ICASSP 2023); trained on VoxCeleb2, whose site describes it as for research purposes, with the audio's copyright held by the original YouTube uploaders. Check that this fits your use.",
+      "id": "wespeaker-resnet34-lm",
+      "note": "WeSpeaker ResNet34-LM speaker embeddings (26.5 MB ONNX, not gated) + flexasr's clustering. Trained on VoxCeleb2; see the licence note. Needs onnxruntime; no account."
+    },
+    {
+      "task": "align",
+      "provider": "whisperx-align",
+      "licence": "varies per language model",
+      "priority": 20,
+      "options": {},
+      "id": "whisperx-wav2vec2",
+      "note": "WhisperX forced alignment with its default wav2vec2 model per language (models downloaded by whisperx; licences differ per language). Fallback aligner; better ones (Qwen3-ForcedAligner, NeMo FA) planned."
+    }
+  ]
+}

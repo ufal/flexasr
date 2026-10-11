@@ -1,0 +1,33 @@
+{
+  "comment": "flexasr's own built-in providers (not models). Models come from the shared registry (registries/asr in the flexitools models repository); registry-snapshot.json is a copy for offline first use.",
+  "models": [
+    {
+      "id": "single-speaker",
+      "task": "diarize",
+      "provider": "single",
+      "licence": "n/a",
+      "licence_verified": true,
+      "priority": 0,
+      "note": "One speaker for the whole recording. Needs nothing; the last resort when no diarizer is usable."
+    },
+    {
+      "id": "builtin-mfcc",
+      "task": "diarize",
+      "provider": "builtin-diar",
+      "source": "builtin:",
+      "licence": "MIT (part of flexasr)",
+      "licence_verified": true,
+      "priority": -10,
+      "note": "Built-in diarization shipped with flexasr (MFCC + clustering, numpy only): no download. Experimental: on real recordings (crpcoral, 8 files, 2026-10-11) it scored below treating everything as one speaker, so it is never chosen automatically; use --provider diarize=builtin-diar explicitly. The fallback is wespeaker-resnet34-lm."
+    },
+    {
+      "id": "native-timestamps",
+      "task": "align",
+      "provider": "native",
+      "licence": "n/a",
+      "licence_verified": true,
+      "priority": 10,
+      "note": "Keeps the word times the transcriber produced (no separate alignment)."
+    }
+  ]
+}
