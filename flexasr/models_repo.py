@@ -21,7 +21,7 @@ DEFAULT = "https://raw.githubusercontent.com/ufal/flexipipe-models/main"
 ASR_DIR = "registries/asr"
 SOURCES = ("official", "flexipipe", "community")
 # Fields of the shared registry format that flexasr does not keep (it has its own equivalents).
-_SHARED_ONLY = ("language_iso", "language_name", "preferred", "curated", "size_mb", "download_command")
+_SHARED_ONLY = ("language_iso", "language_name", "preferred", "curated", "download_command")
 
 
 def base_url() -> str:

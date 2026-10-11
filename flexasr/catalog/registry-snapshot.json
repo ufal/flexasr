@@ -31,6 +31,7 @@
       ],
       "timestamps": "word",
       "priority": 60,
+      "size_mb": 3093,
       "devices": [
         "cuda"
       ],
@@ -67,6 +68,7 @@
       ],
       "timestamps": "word",
       "priority": 55,
+      "size_mb": 1624,
       "id": "crisperwhisper2-turbo",
       "note": "CrisperWhisper 2.0 turbo: verbatim transcription (fillers, repetitions, false starts, vocal events) or intended text, with word times from trained alignment heads. Evaluated on 10 languages (human-labelled sets for English and German, synthetic verbatim sets for the others). Needs the crisperwhisper package."
     },
@@ -100,6 +102,7 @@
       ],
       "timestamps": "word",
       "priority": 50,
+      "size_mb": 1534,
       "id": "crisperwhisper2-medium",
       "note": "CrisperWhisper 2.0 medium: verbatim transcription (fillers, repetitions, false starts, vocal events) or intended text, with word times from trained alignment heads. Evaluated on 10 languages (human-labelled sets for English and German, synthetic verbatim sets for the others). Needs the crisperwhisper package."
     },
@@ -133,6 +136,7 @@
       ],
       "timestamps": "word",
       "priority": 45,
+      "size_mb": 489,
       "id": "crisperwhisper2-small",
       "note": "CrisperWhisper 2.0 small: verbatim transcription (fillers, repetitions, false starts, vocal events) or intended text, with word times from trained alignment heads. Evaluated on 10 languages (human-labelled sets for English and German, synthetic verbatim sets for the others). Needs the crisperwhisper package."
     },
@@ -143,6 +147,7 @@
       "licence": "MIT",
       "timestamps": "word",
       "priority": 40,
+      "size_mb": 3091,
       "id": "faster-whisper-large-v3",
       "note": "Whisper large-v3 (CTranslate2). Strong for big languages, ~99 languages; normalizes (drops fillers). CPU int8 works but is slow."
     },
@@ -153,6 +158,7 @@
       "licence": "MIT",
       "timestamps": "word",
       "priority": 10,
+      "size_mb": 486,
       "id": "faster-whisper-small",
       "note": "Small Whisper for quick runs and tests."
     },
@@ -163,6 +169,7 @@
       "licence": "MIT",
       "timestamps": "word",
       "priority": 1,
+      "size_mb": 78,
       "id": "faster-whisper-tiny",
       "note": "Tiny Whisper: smoke tests only."
     },
@@ -173,6 +180,7 @@
       "licence": "CC-BY-4.0",
       "gated": true,
       "priority": 50,
+      "size_mb": 34,
       "id": "pyannote-community-1",
       "note": "pyannote.audio 4.x. Gated: accept the conditions on Hugging Face and provide a token (HF_TOKEN). Gives full (overlapping) and exclusive diarization."
     },
@@ -191,6 +199,7 @@
         "file": "voxceleb_resnet34_LM.onnx"
       },
       "licence_note": "model weights CC BY 4.0 (attribution: Wang et al., Wespeaker, ICASSP 2023); trained on VoxCeleb2, whose site describes it as for research purposes, with the audio's copyright held by the original YouTube uploaders. Check that this fits your use.",
+      "size_mb": 27,
       "id": "wespeaker-resnet34-lm",
       "note": "WeSpeaker ResNet34-LM speaker embeddings (26.5 MB ONNX, not gated) + flexasr's clustering. Trained on VoxCeleb2; see the licence note. Needs onnxruntime; no account."
     },

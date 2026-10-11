@@ -46,6 +46,7 @@ class Entry:
     timestamps: Optional[str] = None
     devices: Optional[list[str]] = None       # narrows the provider's devices (e.g. VRAM needs)
     priority: int = 0
+    size_mb: Optional[int] = None             # download size (the router skips models that cannot fit)
     options: dict[str, Any] = field(default_factory=dict)  # provider options for this model
     scores: list[dict[str, Any]] = field(default_factory=list)
     note: str = ""
@@ -121,6 +122,12 @@ def candidates(task: str, lang: Optional[str], mode: str, hw: Hardware, allow_re
             why.append(f"does not cover language {lang}")
         if e.restricted and not allow_restricted:
             why.append("restricted licence (" + ", ".join(e.restricted) + "); allow with --allow-restricted")
+        if not why:
+            from .space import shortfall
+
+            lack = shortfall(e)
+            if lack:
+                why.append(lack)
         rank = (
             1 if (task != "transcribe" or mode in e.modes) else 0,   # wanted mode first (transcription only)
             1 if lang and lang in e.languages else 0,  # language-specific before "*"

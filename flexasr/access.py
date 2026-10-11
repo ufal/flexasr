@@ -17,6 +17,7 @@ from getpass import getpass
 from typing import TYPE_CHECKING, Callable, Optional
 
 from .catalog import user_dir
+from .space import cached as _cached
 
 if TYPE_CHECKING:  # pragma: no cover
     from .catalog import Entry
@@ -54,15 +55,6 @@ def token(explicit: Optional[str] = None) -> Optional[str]:
         return None
 
 
-def _cached(repo: str, revision: Optional[str]) -> bool:
-    """Already downloaded (works offline, no token needed)?"""
-    try:
-        from huggingface_hub import snapshot_download
-
-        snapshot_download(repo, revision=revision, local_files_only=True)
-        return True
-    except Exception:
-        return False
 
 
 def _memo_path():

@@ -198,3 +198,8 @@ def run_cli():
     except catalog.NoChoice as e:
         print(f"flexasr: {e}", file=sys.stderr)
         sys.exit(2)
+    except (RuntimeError, OSError, ValueError) as e:
+        if "-v" in sys.argv or "--verbose" in sys.argv:
+            raise
+        print(f"flexasr: {type(e).__name__}: {e}\n(run with -v for the full traceback)", file=sys.stderr)
+        sys.exit(1)
