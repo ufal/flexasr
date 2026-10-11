@@ -18,7 +18,11 @@ pyannote = ["pyannote.audio>=4.0"]
 whisperx = ["whisperx>=3.4"]
 # Verbatim transcription; the weights and their outputs are non-commercial (opt-in: --allow-restricted).
 crisperwhisper = ["crisperwhisper[transformers]>=2.0.3"]
+# Neural fallback diarizer (WeSpeaker ONNX), no account needed.
+speaker = ["onnxruntime", "huggingface_hub"]
 audio = ["soundfile"]
+# Everything a server running the TEITOK module usually wants (pyannote needs `flexasr setup`).
+server = ["flexasr[whisper,whisperx,crisperwhisper,speaker,pyannote,audio]"]
 test = ["pytest"]
 
 [project.scripts]

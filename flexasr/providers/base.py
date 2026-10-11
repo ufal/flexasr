@@ -45,9 +45,18 @@ class Availability:
     device: Optional[str] = None
 
 
+def installed(module: str) -> bool:
+    """Is ``module`` importable? (find_spec raises, rather than returning None, for "a.b" when the
+    parent package "a" is missing.)"""
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
 def availability(spec: ProviderSpec, hardware) -> Availability:
     """Can this provider run here, and on which device? (``reason`` says why not.)"""
-    missing = [m for m in spec.requires if importlib.util.find_spec(m) is None]
+    missing = [m for m in spec.requires if not installed(m)]
     if missing:
         return Availability(False, "missing Python module(s): " + ", ".join(missing))
     device = hardware.best(spec.devices)
