@@ -21,7 +21,7 @@ diarize → transcribe → align → assign speakers → encode (verbatim) → w
 ## Models and licences
 
 flexasr hosts no models. The catalog records where each model can be downloaded (source, pinned revision,
-licence); you download from the source and accept its licence. flexasr's own licence covers the code
+licence); you download from the source and accept its licence. flexasr's own licence (MIT) covers the code
 only. Models with restricted licences (e.g. non-commercial) are never used unless you allow them
 (`--allow-restricted`, or `"allow_restricted": true` in `~/.flexasr/config.json`), and every output
 records which model, revision and licence produced each layer.
@@ -91,3 +91,9 @@ for gated models with `FLEXASR_HOME` set to it. `admin="1"` limits starting task
   under the `flexasr.providers` entry point.
 
 Design: `dev/RESHAPE-2026-10.md` (local).
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). Models keep their own licences (see *Models and licences*).
+
+If you use flexasr in research, please cite it: [`CITATION.cff`](CITATION.cff) has the reference (GitHub shows it as "Cite this repository").

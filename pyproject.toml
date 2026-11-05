@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "0.0.1"
 description = "Modular ASR pipeline for TEITOK corpora: per-language routing, verbatim transcription, timed TEI"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT (code only; models keep their own licences)" }
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = ["numpy"]
 
 [project.optional-dependencies]
