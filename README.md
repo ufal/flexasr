@@ -72,7 +72,9 @@ disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 - start a file with its **Transcribe** button; on the next page choose the language, the mode (verbatim or
   clean) and whether restricted models may be offered (the choices below refresh when you change them);
 - see which models the router would use and why, override them, and set the number of speakers;
-- start the pipeline as a background task, follow its log, and see recent tasks;
+- start the pipeline as a background task, follow its log, and see recent tasks; a file that is already queued or
+  running (also when its output name is taken by a running task) cannot be started again, and a task that has
+  not moved for 12 hours (`stale_hours="…"`) counts as stalled, so the file can be started again;
 - open the resulting `xmlfiles/<name>.xml` in TEITOK's waveform and text views, with the model, licence
   and any restriction of each step listed.
 

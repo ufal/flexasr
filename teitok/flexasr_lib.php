@@ -126,7 +126,7 @@ function fa_media_usage() {
 function fa_audio_list() {
 	// Every audio file of the corpus with its media key and the status of its newest job.
 	$jobs = array();
-	foreach ( array_reverse(fa_jobs(500)) as $job ) $jobs[fa_media_key($job['audio'])] = $job['status'];
+	foreach ( array_reverse(fa_jobs(500)) as $job ) $jobs[fa_media_key($job['audio'])] = fa_job_state($job);
 	$out = array();
 	foreach ( fa_audio_files() as $f ) {
 		$key = fa_media_key($f);
@@ -196,6 +196,25 @@ function fa_jobs($limit = 30) {
 		if ( $job ) $out[] = $job;
 	};
 	return $out;
+}
+
+function fa_job_state($job) {
+	// The status of a job, except that a queued or running job that has not moved for stale_hours (default 12;
+	// settings.xml <flexasr stale_hours="..."/>) counts as "stalled": its server probably stopped.
+	$st = $job['status'];
+	if ( $st != 'queued' && $st != 'running' ) return $st;
+	$dir = fa_jobdir();
+	$last = max((int)@filemtime("$dir/{$job['id']}.status"), (int)@filemtime("$dir/{$job['id']}.log"));
+	return time() - $last > (float)getset('flexasr/stale_hours', 12) * 3600 ? 'stalled' : $st;
+}
+
+function fa_active_job($audio, $output = '') {
+	// A queued or running job on this audio file (or writing this output file), or null.
+	foreach ( fa_jobs(500) as $job ) {
+		if ( fa_job_state($job) != $job['status'] || ($job['status'] != 'queued' && $job['status'] != 'running') ) continue;
+		if ( fa_media_key($job['audio']) == fa_media_key($audio) || ($output && $job['output'] == $output) ) return $job;
+	};
+	return null;
 }
 
 function fa_log_tail($id, $bytes = 20000) {

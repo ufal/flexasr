@@ -40,6 +40,13 @@ if ( $_GET['api'] == 'status' ) {
 } else if ( $act == 'configure' ) {
 	$audio = fa_audio_path($_GET['audio']);
 	if ( !$audio ) fatal('No such audio file in '.fa_h(fa_audio_folder()));
+	if ( $active = fa_active_job($audio) ) {
+		$maintext .= "<h1>{%Speech recognition}: ".fa_h(basename($audio))."</h1><p>{%This file is already being processed} ("
+			.fa_h($active['status']).", ".fa_h($active['user']).", ".fa_h(str_replace('T', ' ', substr($active['started'], 0, 16))).").</p>
+			<p><a href='index.php?action=$action&act=job&job=".urlencode($active['id'])."'>{%Follow the task}</a> &middot;
+			<a href='index.php?action=$action'>{%back}</a></p>";
+		return;
+	};
 	$lang = preg_replace('/[^A-Za-z_-]/', '', $_GET['lang'] ?: getset('flexasr/language', getset('defaults/language', '')));
 	$mode = $_GET['mode'] == 'clean' ? 'clean' : 'verbatim';
 	// restricted models: the project's default (settings.xml <flexasr restricted="1"/>) until the form says otherwise
@@ -113,7 +120,17 @@ if ( $_GET['api'] == 'status' ) {
 	$fid = fa_file_id($_POST['fid'] ?: $audio);
 	if ( !$fid ) fatal('No valid output file name');
 	$output = "xmlfiles/$fid.xml";
+	$lock = fopen(fa_jobdir().'/start.lock', 'c');     // check and start as one step: no double start from a double click
+	if ( $lock ) flock($lock, LOCK_EX);
+	if ( $active = fa_active_job($audio, $output) ) {
+		if ( $lock ) fclose($lock);
+		$maintext .= "<h1>{%Speech recognition}</h1><p class='wrong'>{%This file is already being processed} ("
+			.fa_h($active['status']).", ".fa_h($active['user']).").</p>
+			<p><a href='index.php?action=$action&act=job&job=".urlencode($active['id'])."'>{%Follow the task}</a></p>";
+		return;
+	};
 	if ( file_exists($output) && !$_POST['overwrite'] ) {
+		if ( $lock ) fclose($lock);
 		$maintext .= "<h1>{%Speech recognition}</h1><p class='wrong'>".fa_h($output)." {%already exists}.</p>
 			<p><a href='javascript:history.back()'>{%back}</a></p>";
 		return;
@@ -136,6 +153,7 @@ if ( $_GET['api'] == 'status' ) {
 		'models' => $models,
 	);
 	fa_start($job);
+	if ( $lock ) fclose($lock);
 	header("Location: index.php?action=$action&act=job&job=".$job['id']);
 	print "<script>top.location='index.php?action=$action&act=job&job=".$job['id']."';</script>";
 	exit;
@@ -243,6 +261,7 @@ if ( $_GET['api'] == 'status' ) {
 								});
 								if ( ids(a).length > 5 ) td.appendChild(document.createTextNode(', …'));
 							} else if ( a.j == 'failed' ) td.textContent = '{%last run failed}';
+							else if ( a.j == 'stalled' ) td.textContent = '{%last run did not finish}';
 							tr.appendChild(td);
 							td = document.createElement('td');
 							if ( g != 'running' ) {
