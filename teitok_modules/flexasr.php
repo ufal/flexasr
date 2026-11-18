@@ -127,7 +127,7 @@ if ( $_GET['api'] == 'status' ) {
 		<tr><th>{%Speaker changes}</th><td><label><input type='hidden' name='snap' value='0'><input type='checkbox' name='snap' value='1' checked>
 			{%move them to the nearest pause or sentence end (corrects words at the edge of a turn)}</label></td></tr>
 		<tr><th>{%Output file}</th><td>xmlfiles/<input name='fid' value='".fa_h($fid)."' size='30'>.xml
-			<label><input type='checkbox' name='overwrite' value='1'> {%replace if it exists}</label></td></tr>
+			".(file_exists("xmlfiles/$fid.xml") ? "<span class='wrong'>{%This file exists already and is never replaced: choose another name, or delete the old transcription first (file admin)}</span>" : "")."</td></tr>
 		</table>";
 	if ( $notices ) {
 		$maintext .= "<h3>{%Licence conditions}</h3>";
@@ -147,8 +147,9 @@ if ( $_GET['api'] == 'status' ) {
 			<p><a href='index.php?action=$action&act=job&job=".urlencode($active['id'])."'>{%Follow the task}</a></p>";
 		return;
 	};
-	if ( file_exists($output) && !$_POST['overwrite'] ) {
+	if ( file_exists($output) ) {		# a transcription is never replaced: it may hold hours of corrections
 		$maintext .= "<h1>{%Speech recognition}</h1><p class='wrong'>".fa_h($output)." {%already exists}.</p>
+			<p>{%To transcribe again, choose another output name, or delete the old transcription first (file admin).}</p>
 			<p><a href='javascript:history.back()'>{%back}</a></p>";
 		return;
 	};

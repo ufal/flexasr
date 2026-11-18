@@ -94,18 +94,21 @@ def main(argv=None):
     p.add_argument("audio")
     p.add_argument("-o", "--output", help="output file (.xml: TEITOK, .json: intermediate document)")
     p.add_argument("--media-url", help="media url in the TEI header (default: Audio/<file name>)")
+    p.add_argument("--force", action="store_true", help="replace the output file if it exists (never done by default: it may hold corrections)")
     _common(p)
 
     p = sub.add_parser("stage", help="run stages on a saved intermediate document")
     p.add_argument("doc", help="intermediate JSON (flexasr-doc/1)")
     p.add_argument("stages", help=f"comma-separated, from: {','.join(ALL_STAGES)}")
     p.add_argument("-o", "--output", required=True)
+    p.add_argument("--force", action="store_true", help="replace the output file if it exists")
     _common(p)
 
     p = sub.add_parser("write", help="intermediate JSON → TEITOK XML")
     p.add_argument("doc")
     p.add_argument("-o", "--output", required=True)
     p.add_argument("--media-url", help="media url in the TEI header (default: Audio/<file name>)")
+    p.add_argument("--force", action="store_true", help="replace the output file if it exists")
 
     sub.add_parser("info", help="hardware, and which providers can run here (and why not)")
 
@@ -201,6 +204,10 @@ def main(argv=None):
             raise SystemExit(f"unknown catalog id {a.model!r}; see `flexasr models`")
         ok = access.setup(entries[a.model], interactive=not a.check, download=not (a.no_download or a.check))
         return 0 if ok else 1
+
+    out_path = getattr(a, "output", None)
+    if out_path and Path(out_path).exists() and not getattr(a, "force", False):
+        raise SystemExit(f"{out_path} exists and is not replaced (it may hold corrections); use --force, or another name")
 
     if a.cmd == "write":
         doc = Doc.from_json(Path(a.doc).read_text(encoding="utf-8"))

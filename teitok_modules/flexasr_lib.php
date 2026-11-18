@@ -411,7 +411,8 @@ function fa_start($job) {
 	$tmpout = "$dir/$id.xml";
 	$work = 'echo running > '.$q("$dir/$id.status").'; '
 		.fa_cmd(fa_run_args($job, $tmpout)).' >> '.$q("$dir/$id.log").' 2>&1'
-		.' && mkdir -p '.$q(dirname($job['output'])).' && mv -f '.$q($tmpout).' '.$q($job['output']);
+		.' && mkdir -p '.$q(dirname($job['output']))
+		.' && if [ -e '.$q($job['output']).' ]; then echo "'.$job['output'].' appeared in the meantime and is never replaced; the result is kept in '.$tmpout.'" >> '.$q("$dir/$id.log").'; false; else mv '.$q($tmpout).' '.$q($job['output']).'; fi';
 	$inner = 'sh -c '.$q($work);
 	$serial = 'if command -v flock >/dev/null 2>&1; then flock '.$q("$dir/run.lock").' '.$inner.'; else '.$inner.'; fi';
 	$script = 'echo $$ > '.$q("$dir/$id.pid").'; cd '.$q(getcwd()).' && { '.$serial.'; }; rc=$?; '
