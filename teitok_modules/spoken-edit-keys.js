@@ -25,6 +25,7 @@ SE.keys = (function () {
 		["c", "nextLow", "next uncertain word (least certain first)"], ["C", "prevLow", "previous uncertain word"],
 		["a", "accept", "accept this word as correct and go to the next uncertain one"],
 		["mod+z", "undo", "undo"], ["mod+shift+z", "redo", "redo"], ["mod+y", "redo", ""], ["mod+s", "save", "save"],
+		["f", "fullscreen", "full screen on / off"],
 		["?", "help", "the actions and keys window"]
 	];
 	function name ( ev ) {

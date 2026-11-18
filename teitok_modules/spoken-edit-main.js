@@ -184,6 +184,14 @@ SE.main = (function () {
 			say("Saving…", "info");
 			SE.model.save().then(function () { SE.view.render(); refresh(); say("Saved.", "ok"); }, function ( e ) { say(e.message, "error"); });
 		},
+		fullscreen: function () {
+			var fs = document.fullscreenElement || document.webkitFullscreenElement;
+			if ( fs ) return (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+			var f = app.requestFullscreen || app.webkitRequestFullscreen;
+			if ( !f ) return say("This browser cannot show the editor full screen.", "error");
+			var r = f.call(app);
+			if ( r && r.catch ) r.catch(function () { say("The browser did not allow full screen here.", "error"); });
+		},
 		help: function () { if ( SE.palette ) SE.palette.toggle(); }
 	};
 	for ( var n = 1; n <= 9; n++ ) (function ( n ) { actions["who" + n] = function () { whoNumber(n); }; })(n);
@@ -248,6 +256,14 @@ SE.main = (function () {
 				run: function ( a ) { if ( !busy && actions[a] ) actions[a](); }, focus: function () { app.focus(); },
 				speakers: function () { return data().speakers.map(function ( p ) { return p.id; }); }, audio: !!c.audio, hasconf: !!d.hasconf
 			});
+			if ( app.requestFullscreen || app.webkitRequestFullscreen ) {
+				var fsB = button("⛶", "full screen on / off (f)", actions.fullscreen); fsB.setAttribute("aria-label", "full screen"); bar.appendChild(fsB);
+				var onFs = function () {
+					var on = (document.fullscreenElement || document.webkitFullscreenElement) === app;
+					fsB.classList.toggle("se-pressed", on); if ( SE.palette ) SE.palette.mount(on ? app : document.body); app.focus();
+				};
+				document.addEventListener("fullscreenchange", onFs); document.addEventListener("webkitfullscreenchange", onFs);
+			}
 			if ( palB ) bar.appendChild(palB);      // without the palette script the keys still work
 			speakersBox = el("details", "se-speakers"); speakersBox.appendChild(el("summary", "", "Speakers"));
 			var spkBody = el("div"); speakersBox.appendChild(spkBody);

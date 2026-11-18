@@ -10,7 +10,7 @@ SE.palette = (function () {
 		["Speaker", "speakers"],
 		["Audio", ["play", "playUtt", "stop", "adjust"], "audio"],
 		["Uncertain words", ["toggleConf", "nextLow", "prevLow", "accept"], "conf"],
-		["File", ["undo", "redo", "save"]]
+		["File", ["undo", "redo", "save", "fullscreen"]]
 	];
 	var SHORT = {
 		left: "‹ word", right: "word ›", up: "‹ utterance", down: "utterance ›", home: "first word", end: "last word", extendLeft: "‹ select", extendRight: "select ›", extract: "extract to new utterance",
@@ -20,7 +20,7 @@ SE.palette = (function () {
 		edit: "edit", insertBefore: "insert before", insertAfter: "insert after", delete: "delete", join: "join with next",
 		play: "play / pause", playUtt: "play utterance", stop: "stop", adjust: "adjust times",
 		toggleConf: "show / hide marking", nextLow: "next uncertain", prevLow: "previous uncertain", accept: "accept",
-		undo: "undo", redo: "redo", save: "save"
+		undo: "undo", redo: "redo", save: "save", fullscreen: "full screen"
 	};
 	var KEY = "spoken-edit-palette", opts, win, body, toggleB, buttons = {}, speakerBox, pos = { x: null, y: null, open: false };
 
@@ -90,6 +90,8 @@ SE.palette = (function () {
 	}
 
 	var api = {
+		// the window has to live inside the full screen element to be seen in full screen
+		mount: function ( parent ) { if ( win && win.parentNode !== parent ) parent.appendChild(win); },
 		// opts: { run(action), focus(), speakers() -> ids, audio, hasconf }; returns the icon button for the bar
 		init: function ( o ) {
 			opts = o; load(); build();
