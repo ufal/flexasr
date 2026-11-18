@@ -109,6 +109,12 @@ def main(argv=None):
 
     sub.add_parser("info", help="hardware, and which providers can run here (and why not)")
 
+    p = sub.add_parser("install", help="install the `flexasr` command (a launcher that works whichever Python is active)")
+    p.add_argument("what", choices=("wrapper",))
+    p.add_argument("--path", help="the folder for the command (default: /usr/local/bin if writable, else ~/.local/bin)")
+    p.add_argument("--venv", help="the virtual environment it runs (default: the one this is run from)")
+    p.add_argument("--force", action="store_true", help="replace a file or link of that name that was not made by this command")
+
     p = sub.add_parser("setup", help="guided access to a gated model (account, token, conditions), then download")
     p.add_argument("model", help="catalog id, e.g. pyannote-community-1")
     p.add_argument("--check", action="store_true", help="only report what is missing (no questions)")
@@ -121,8 +127,21 @@ def main(argv=None):
     p.add_argument("--json", action="store_true", help="machine-readable (entries, usability, choices)")
     p.add_argument("--allow-restricted", action="store_true")
 
+    for name in ("run", "stage", "info", "models", "setup"):          # the commands that read the models registry
+        sub.choices[name].add_argument("--refresh-cache", action="store_true",
+                                       help="ignore the cached copy of the models registry (it is kept for a day)")
+
     a = ap.parse_args(argv)
+    if getattr(a, "refresh_cache", False):
+        from . import remote
+
+        remote.REFRESH = True
     logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO, format="%(message)s")
+    if a.cmd == "install":
+        from .launcher import install
+
+        return install(a.path, a.venv, a.force)
+
     from .cache import setup as setup_cache
 
     mdir = setup_cache(load_config())        # downloads go to models_dir (before model libraries load)

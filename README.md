@@ -53,6 +53,17 @@ that repository's `resources/languages.json`. flexasr caches both for a day and 
 cache, or from a snapshot it ships. To use a local checkout or another copy, set
 `{"models_repo": "file:///path/to/checkout"}` in `~/.flexasr/config.json` (or `FLEXASR_MODELS_REPO`).
 
+## The `flexasr` command
+
+`flexasr install wrapper` writes a small launcher, so that plain `flexasr …` works whichever Python is active (the way
+`flexipipe install wrapper` does): into `/usr/local/bin` when that can be written, else `~/.local/bin`, or where
+`--path` says. It runs the environment it was made from, or the one given with `--venv`. The tools of the ecosystem
+can share one environment: create it once (`python3 -m venv ~/.flexitools/venv`), install the tools into it, run
+`install wrapper` for each, and set `FLEXITOOLS_VENV` to move all of them at once; `FLEXASR_VENV` overrides it for
+this tool alone (a tool that needs its own packages can keep its own environment: CrisperWhisper's CTranslate2
+fork, for one, cannot live next to the upstream one that faster-whisper needs). A model registry that changed is
+fetched at once with `--refresh-cache` (otherwise it is kept for a day).
+
 ## Quick start
 
 ```bash

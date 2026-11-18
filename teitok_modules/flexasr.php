@@ -195,7 +195,8 @@ if ( $_GET['api'] == 'status' ) {
 		$info = fa_result_info($job['output']);
 		$maintext .= "<h2>{%Result}</h2>
 			<p>".fa_h($job['output']).": {$info['utts']} {%utterances}, {$info['toks']} {%tokens}</p>
-			<p><a href='index.php?action=wavesurfer&cid=".urlencode($cid)."'>{%Waveform view}</a>
+			<p><a href='index.php?action=spoken-edit&cid=".urlencode($cid)."'><b>{%Edit the transcript}</b></a>
+			&middot; <a href='index.php?action=wavesurfer&cid=".urlencode($cid)."'>{%Waveform view}</a>
 			&middot; <a href='index.php?action=file&cid=".urlencode($cid)."'>{%Text view}</a>";
 		if ( $info['conf'] )
 			$maintext .= " &middot; <a href='index.php?action=whisper&cid=".urlencode($cid)."'>{%Confidence view}</a>";
@@ -272,6 +273,8 @@ if ( $_GET['api'] == 'status' ) {
 							if ( i ) td.appendChild(document.createTextNode(', '));
 							var l = document.createElement('a'); l.textContent = id;
 							l.href = 'index.php?action=wavesurfer&cid=' + encodeURIComponent(id); td.appendChild(l);
+							var e = document.createElement('a'); e.textContent = '{%edit}'; e.style.marginLeft = '4px';
+							e.href = 'index.php?action=spoken-edit&cid=' + encodeURIComponent(id); td.appendChild(document.createTextNode(' (')); td.appendChild(e); td.appendChild(document.createTextNode(')'));
 						});
 						if ( a.xn > a.x.length ) td.appendChild(document.createTextNode(', …'));
 					} else if ( a.j == 'failed' ) td.textContent = '{%last run failed}';
@@ -352,7 +355,7 @@ if ( $_GET['api'] == 'status' ) {
 		foreach ( $jobs as $job ) {
 			$res = '';
 			if ( $job['status'] == 'done' && file_exists($job['output']) )
-				$res = "<a href='index.php?action=wavesurfer&cid=".urlencode($job['fid'])."'>".fa_h($job['fid'])."</a>";
+				$res = "<a href='index.php?action=wavesurfer&cid=".urlencode($job['fid'])."'>".fa_h($job['fid'])."</a> (<a href='index.php?action=spoken-edit&cid=".urlencode($job['fid'])."'>{%edit}</a>)";
 			$maintext .= "<tr><td><a href='index.php?action=$action&act=job&job=".urlencode($job['id'])."'>"
 				.fa_h(str_replace('T', ' ', substr($job['started'], 0, 16)))."</a></td>
 				<td>".fa_h(basename($job['audio']))."</td><td>".fa_h($job['lang'] ?: 'auto')."</td>

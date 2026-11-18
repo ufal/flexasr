@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -18,6 +19,7 @@ from .home import user_dir
 
 log = logging.getLogger(__name__)
 MAX_AGE = 24 * 3600
+REFRESH = False          # --refresh-cache: ignore the cached copies this time (also $FLEXASR_REFRESH_CACHE)
 
 
 def cache_dir() -> Path:
@@ -50,6 +52,8 @@ def fetch_json(url: str, max_age: float = MAX_AGE, timeout: float = 10.0) -> Opt
             log.debug("cannot read %s: %s", url, e)
             return None
     p = _cache_path(url)
+    if REFRESH or os.environ.get("FLEXASR_REFRESH_CACHE"):
+        max_age = 0
     if p.is_file() and time.time() - p.stat().st_mtime < max_age:
         try:
             return json.loads(p.read_text(encoding="utf-8"))
