@@ -8,12 +8,13 @@
 //   index.php?action=flexasr&api=audio&status=todo|running|done|all&q=TEXT&offset=N&limit=N   one page of audio files
 //   index.php?action=flexasr&api=media&step=start|next   the scan of xmlfiles/ for the media they use (steps)
 // Settings (settings.xml): <flexasr bin="/path/to/venv/bin/flexasr" home="/path/to/flexasr-home"
-//   models_dir="/big/disk/models" hf_home="..." users="1" language="fra" restricted="1"/>
-//   (the module is for administrators; users="1": every logged-in user may use it, and stop their own tasks;
+//   models_dir="/big/disk/models" hf_home="..." admin="1" language="fra" restricted="1"/>
+//   (any staff login may use the module (not SSO logins); admin="1": only administrators; a task can be stopped by
+//   the person who started it or an administrator;
 //   language: default language; restricted="1": offer restricted-licence
 //   models by default, e.g. for an academic corpus, with the licence conditions shown before a job starts)
 
-check_login(getset('flexasr/users') ? 'user' : 'admin');       // administrators only, unless <flexasr users="1"/>
+check_login(getset('flexasr/admin') ? 'admin' : 'user');       // any staff login, or only administrators with <flexasr admin="1"/>
 require_once(__DIR__.'/flexasr_lib.php');
 
 $fa_modes = array('verbatim' => '{%verbatim} ({%keeps fillers, repetitions, false starts})',

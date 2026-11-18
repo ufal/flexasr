@@ -7,6 +7,11 @@ function fa_who($job) {
 	return $job['name'] ?? ($job['user'] ?? '');
 }
 
+function fa_lower($s) { return function_exists('mb_strtolower') ? mb_strtolower($s, 'UTF-8') : strtolower($s); }
+function fa_contains($hay, $needle) {
+	return function_exists('mb_strpos') ? mb_strpos($hay, $needle, 0, 'UTF-8') !== false : strpos($hay, $needle) !== false;
+}
+
 function fa_h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 // --- settings (settings.xml: <flexasr bin=".." home=".." models_dir=".." hf_home=".." admin="1" .../>) ---
@@ -152,7 +157,7 @@ function fa_audio_page($status, $q, $offset, $limit) {
 	$locked = fa_locked_audio();
 	$jobs = array();
 	foreach ( array_reverse(fa_jobs(500)) as $job ) $jobs[fa_media_key($job['audio'])] = fa_job_state($job);   // newest wins
-	$q = mb_strtolower(trim((string)$q));
+	$q = fa_lower(trim((string)$q));
 	$counts = array('todo' => 0, 'running' => 0, 'done' => 0);
 	$items = array();
 	$skipped = 0;
@@ -160,7 +165,7 @@ function fa_audio_page($status, $q, $offset, $limit) {
 	$offset = max(0, (int)$offset);
 	$prefix = strlen(fa_audio_folder()) + 1;
 	foreach ( fa_audio_files_cached() as $f ) {
-		if ( $q !== '' && mb_strpos(mb_strtolower(substr($f, $prefix)), $q) === false ) continue;
+		if ( $q !== '' && !fa_contains(fa_lower(substr($f, $prefix)), $q) ) continue;
 		$key = fa_media_key($f);
 		if ( isset($locked[$key]) ) { $st = 'running'; $j = $locked[$key]['status']; $x = array(); }
 		else {
