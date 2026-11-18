@@ -66,7 +66,9 @@ disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 
 `teitok/` holds a TEITOK module (`index.php?action=flexasr`). In it, project members can:
 
-- upload an audio file, or pick one from the corpus's `Audio/` folder;
+- upload an audio file, or pick one from the corpus's `Audio/` folder, where the files are grouped by what is
+  left to do: no TEITOK file yet, in progress, and already in a TEITOK file (found through the `<media url>` in
+  the header of the `xmlfiles/`, with or without the `Audio/` prefix; whatever tool made that file);
 - choose the language, the mode (verbatim or clean) and whether restricted models may be offered;
 - see which models the router would use and why, override them, and set the number of speakers;
 - start the pipeline as a background task, follow its log, and see recent tasks;

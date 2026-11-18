@@ -12,11 +12,15 @@ directory (the package itself would always take the latest revision).
 
 from __future__ import annotations
 
+import logging
+import os
+
 from .. import langs
 from ..doc import Word
 from ._words import utterances_from_words
 from .base import ProviderSpec, Transcriber
 
+log = logging.getLogger("flexasr")
 _FILES = ["*.json", "*.bin", "*.safetensors", "*.txt", "*.model"]
 
 
@@ -34,7 +38,7 @@ class CrisperWhisper(Transcriber):
     spec = ProviderSpec(
         name="crisperwhisper", family="crisperwhisper", tasks=("transcribe",),
         modes=("verbatim", "clean"), timestamps="word",
-        devices=("cuda", "cpu"),                 # neither backend uses MPS
+        devices=("cuda", "mps", "cpu"),          # MPS: transformers backend only, float16 (tested on an M1)
         requires=("crisperwhisper", "huggingface_hub"),
         description="CrisperWhisper 2.0: verbatim or intended transcription with word times.",
     )
@@ -54,10 +58,10 @@ class CrisperWhisper(Transcriber):
 
     def _settings(self) -> dict:
         o = self.ctx.options
-        backend = o.get("backend") or ("ct2" if _ct2_fork() else "transformers")
+        backend = o.get("backend") or ("ct2" if _ct2_fork() and self.ctx.device != "mps" else "transformers")
         if o.get("compute_type"):
             compute = o["compute_type"]
-        elif self.ctx.device == "cuda":
+        elif self.ctx.device in ("cuda", "mps"):
             compute = "float16"
         else:
             compute = "int8" if backend == "ct2" else "float32"
@@ -66,6 +70,10 @@ class CrisperWhisper(Transcriber):
     def transcribe(self, audio, sr, doc):
         from crisperwhisper import CrisperWhisperModel
 
+        if self.ctx.device == "mps":
+            os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+            log.warning("crisperwhisper runs on the Apple GPU (MPS): only lightly tested, and the output can "
+                        "differ slightly from CPU/CUDA (set FLEXASR_DEVICE=cpu to compare)")
         model = CrisperWhisperModel(self._local_dir(), **self._settings())
         opts = dict(self.ctx.options.get("transcribe", {}))
         mode = "verbatim" if self.ctx.mode == "verbatim" else "intended"

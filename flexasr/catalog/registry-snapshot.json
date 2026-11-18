@@ -33,7 +33,8 @@
       "priority": 60,
       "size_mb": 3093,
       "devices": [
-        "cuda"
+        "cuda",
+        "mps"
       ],
       "id": "crisperwhisper2-large",
       "note": "CrisperWhisper 2.0 large: verbatim transcription (fillers, repetitions, false starts, vocal events) or intended text, with word times from trained alignment heads. Evaluated on 10 languages (human-labelled sets for English and German, synthetic verbatim sets for the others). Needs the crisperwhisper package."

@@ -5,6 +5,8 @@
 //   index.php?action=flexasr&act=run         start (POST)
 //   index.php?action=flexasr&act=job&job=ID  progress, log and result
 //   index.php?action=flexasr&api=status&job=ID   JSON for the progress page
+//   index.php?action=flexasr&api=audio       JSON: the audio files, with their media keys and job status
+//   index.php?action=flexasr&api=media&step=start|next|result   the scan of xmlfiles/ for the media they use
 // Settings (settings.xml): <flexasr bin="/path/to/venv/bin/flexasr" home="/path/to/flexasr-home"
 //   models_dir="/big/disk/models" hf_home="..." admin="1"/>  (admin="1": only admins may run jobs)
 
@@ -19,6 +21,18 @@ if ( $_GET['api'] == 'status' ) {
 	$job = fa_job($_GET['job']);
 	if ( !$job ) { http_response_code(404); print json_encode(array('error' => 'no such job')); exit; };
 	print json_encode(array('status' => $job['status'], 'log' => fa_log_tail($job['id'])));
+	exit;
+
+} else if ( $_GET['api'] == 'audio' ) {
+	header('Content-Type: application/json');
+	print json_encode(array('folder' => fa_audio_folder(), 'audio' => fa_audio_list()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+	exit;
+
+} else if ( $_GET['api'] == 'media' ) {
+	header('Content-Type: application/json');
+	$step = $_GET['step'];
+	if ( $step == 'result' ) print json_encode(array('usage' => (object)fa_media_usage()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+	else print json_encode(fa_media_scan($step == 'start' ? 'start' : 'next'));
 	exit;
 
 } else if ( $act == 'configure' ) {
@@ -172,15 +186,69 @@ if ( $_GET['api'] == 'status' ) {
 	if ( !$files ) {
 		$maintext .= "<p>{%There are no audio files yet.}</p>";
 	} else {
-		$opts = '';
-		foreach ( $files as $f ) $opts .= "<option value='".fa_h($f)."'>".fa_h(substr($f, strlen(fa_audio_folder()) + 1))."</option>";
+		$audiourl = "index.php?action=$action&api=audio";
+		$mediaurl = "index.php?action=$action&api=media";
+		$audiohtml = "<div id='fa-audio-bar'>
+			<select id='fa-filter'><option value='todo'>{%No TEITOK file yet}</option><option value='running'>{%In progress}</option>
+				<option value='done'>{%Already in a TEITOK file}</option><option value='all'>{%All audio files}</option></select>
+			<input id='fa-search' placeholder='{%search}' size='20'> <span id='fa-count'></span>
+			<span id='fa-scan' style='font-size: smaller; color: #777;'></span></div>
+			<table id='fa-audio-table'></table><p id='fa-more' style='display: none;'><a href='#' id='fa-more-link'>{%show more}</a></p>
+			<script>
+			(function () {
+				var rows = [], usage = null, shown = 200, folder = '';
+				var T = document.getElementById('fa-audio-table'), F = document.getElementById('fa-filter'), S = document.getElementById('fa-search');
+				function ids(a) { var u = usage && usage[a.k]; return u ? u : []; }
+				function status(a) {
+					if ( a.j == 'queued' || a.j == 'running' ) return 'running';
+					if ( !usage ) return 'todo';
+					return ids(a).length ? 'done' : 'todo';
+				}
+				function name(a) { return a.p.substring(folder.length + 1); }
+				function draw() {
+					var f = F.value, q = S.value.toLowerCase(), n = 0, html = [];
+					T.innerHTML = '';
+					rows.forEach(function (a) {
+						var st = status(a);
+						if ( f != 'all' && st != f ) return;
+						if ( q && name(a).toLowerCase().indexOf(q) < 0 ) return;
+						n++;
+						if ( n > shown ) return;
+						var tr = document.createElement('tr'), td = document.createElement('td'), r = document.createElement('input');
+						r.type = 'radio'; r.name = 'audio'; r.value = a.p; r.required = true;
+						td.appendChild(r); tr.appendChild(td);
+						td = document.createElement('td'); td.textContent = name(a); tr.appendChild(td);
+						td = document.createElement('td'); td.style.fontSize = 'smaller';
+						var u = ids(a);
+						td.textContent = a.j == 'queued' || a.j == 'running' ? a.j : (u.length ? '→ ' + u.slice(0, 3).join(', ') + (u.length > 3 ? ', …' : '') : (a.j == 'failed' ? '{%last run failed}' : ''));
+						tr.appendChild(td); T.appendChild(tr);
+					});
+					document.getElementById('fa-count').textContent = n + ' / ' + rows.length;
+					document.getElementById('fa-more').style.display = n > shown ? '' : 'none';
+				}
+				F.onchange = S.oninput = function () { shown = 200; draw(); };
+				document.getElementById('fa-more-link').onclick = function (e) { e.preventDefault(); shown += 400; draw(); };
+				function json(u) { return fetch(u).then(function (r) { return r.json(); }); }
+				function scan() {
+					var out = document.getElementById('fa-scan');
+					json('$mediaurl&step=start').then(function loop(d) {
+						out.textContent = '{%checking TEITOK files}: ' + d.pos + ' / ' + d.total;
+						if ( d.done ) return json('$mediaurl&step=result').then(function (r) {
+							usage = r.usage; out.textContent = ''; draw();
+						});
+						return json('$mediaurl&step=next').then(loop);
+					}).catch(function () { out.textContent = '{%could not check the TEITOK files}'; });
+				}
+				json('$audiourl').then(function (d) { rows = d.audio; folder = d.folder; draw(); scan(); });
+			})();
+			</script>";
 		$lang = getset('flexasr/language', getset('defaults/language', ''));
 		$modeopts = '';
 		foreach ( $fa_modes as $k => $v ) $modeopts .= "<option value='$k'>$v</option>";
 		$maintext .= "<form action='index.php' method='get'>
 			<input type='hidden' name='action' value='$action'><input type='hidden' name='act' value='configure'>
 			<table>
-			<tr><th>{%Audio file}</th><td><select name='audio'>$opts</select></td></tr>
+			<tr><th>{%Audio file}</th><td>$audiohtml</td></tr>
 			<tr><th>{%Language}</th><td><input name='lang' value='".fa_h($lang)."' size='10' placeholder='fr / fra / French'>
 				<span style='font-size: smaller;'>{%empty: detect automatically}</span></td></tr>
 			<tr><th>{%Mode}</th><td><select name='mode'>$modeopts</select></td></tr>

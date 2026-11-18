@@ -41,6 +41,100 @@ function fa_audio_files() {
 	return $out;
 }
 
+// --- which audio files already have a TEITOK file, and which are being processed ---
+
+function fa_media_key($url) {
+	// A media url as a path relative to the audio folder: "Audio/x.mp3", "./Audio/x.mp3", "x.mp3" and the
+	// url-encoded form all give "x.mp3" (and sub/x.mp3 stays sub/x.mp3). Unicode-normalized, since files
+	// uploaded from a Mac often have decomposed accents.
+	$u = urldecode(trim((string)$url));
+	$u = preg_replace('#^(\./)+#', '', $u);
+	$folder = fa_audio_folder();
+	if ( strpos($u, "$folder/") === 0 ) $u = substr($u, strlen($folder) + 1);
+	if ( class_exists('Normalizer') ) $u = Normalizer::normalize($u, Normalizer::FORM_C) ?: $u;
+	return $u;
+}
+
+function fa_media_keys($path) {
+	// The media keys of one xmlfile: its <media url="..."> elements, read from the first 64 KB.
+	$fh = @fopen($path, 'r');
+	$head = $fh ? fread($fh, 65536) : '';
+	if ( $fh ) fclose($fh);
+	$keys = array();
+	if ( preg_match_all('/<media\b[^>]*?\burl\s*=\s*(?:"([^"]*)"|\'([^\']*)\')/i', $head, $m, PREG_SET_ORDER) ) {
+		foreach ( $m as $hit ) $keys[] = fa_media_key($hit[1] !== '' ? $hit[1] : ($hit[2] ?? ''));
+	};
+	return $keys;
+}
+
+// The scan of xmlfiles/ runs in steps (api=media), so a large corpus never blocks a page: the list of files and
+// the position are kept in tmp/flexasr-jobs/media-scan.json, and the keys of each file (by modification time and
+// size) in media-index.json, so a later scan only reads the files that are new or changed.
+function fa_json_read($f) { return file_exists($f) ? (json_decode(file_get_contents($f), true) ?: array()) : array(); }
+function fa_json_write($f, $data) {
+	file_put_contents($f, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+}
+
+function fa_media_scan($step, $budget = 1.5) {
+	$statefile = fa_jobdir().'/media-scan.json';
+	$cachefile = fa_jobdir().'/media-index.json';
+	if ( $step == 'start' ) {
+		$files = array();
+		if ( is_dir('xmlfiles') ) {
+			$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator('xmlfiles', FilesystemIterator::SKIP_DOTS));
+			foreach ( $it as $f ) {
+				if ( strtolower($f->getExtension()) != 'xml' ) continue;
+				$files[] = array(str_replace('\\', '/', $f->getPathname()), $f->getMTime().':'.$f->getSize());
+			};
+		};
+		$state = array('files' => $files, 'pos' => 0);
+		fa_json_write($statefile, $state);
+		return array('done' => !$files, 'pos' => 0, 'total' => count($files));
+	};
+	$state = fa_json_read($statefile);
+	if ( !$state ) return array('done' => true, 'pos' => 0, 'total' => 0);
+	$cache = fa_json_read($cachefile);
+	$t0 = microtime(true);
+	$total = count($state['files']);
+	$dirty = false;
+	while ( $state['pos'] < $total && microtime(true) - $t0 < $budget ) {
+		list($path, $sig) = $state['files'][$state['pos']++];
+		if ( !isset($cache[$path]) || $cache[$path]['sig'] != $sig ) {
+			$cache[$path] = array('sig' => $sig, 'keys' => fa_media_keys($path));
+			$dirty = true;
+		};
+	};
+	if ( $dirty ) fa_json_write($cachefile, $cache);
+	fa_json_write($statefile, $state);
+	return array('done' => $state['pos'] >= $total, 'pos' => $state['pos'], 'total' => $total);
+}
+
+function fa_media_usage() {
+	// media key => ids of the xmlfiles that point at it (from the files of the last scan).
+	$state = fa_json_read(fa_jobdir().'/media-scan.json');
+	$cache = fa_json_read(fa_jobdir().'/media-index.json');
+	$usage = array();
+	foreach ( (array)$state['files'] as $f ) {
+		$path = $f[0];
+		if ( !isset($cache[$path]) ) continue;
+		$id = preg_replace('#^xmlfiles/|\.xml$#i', '', $path);
+		foreach ( $cache[$path]['keys'] as $k ) $usage[$k][] = $id;
+	};
+	return $usage;
+}
+
+function fa_audio_list() {
+	// Every audio file of the corpus with its media key and the status of its newest job.
+	$jobs = array();
+	foreach ( array_reverse(fa_jobs(500)) as $job ) $jobs[fa_media_key($job['audio'])] = $job['status'];
+	$out = array();
+	foreach ( fa_audio_files() as $f ) {
+		$key = fa_media_key($f);
+		$out[] = array('p' => $f, 'k' => $key, 'j' => $jobs[$key] ?? '');
+	};
+	return $out;
+}
+
 function fa_audio_path($rel) {
 	// A relative audio path, only if it really is inside the audio folder (no ../ tricks).
 	$root = realpath(fa_audio_folder());
@@ -94,7 +188,7 @@ function fa_job($id) {
 
 function fa_jobs($limit = 30) {
 	$files = glob(fa_jobdir().'/*.json');
-	$files = array_filter($files, function ($f) { return strpos(basename($f), 'models-') !== 0; });
+	$files = array_filter($files, function ($f) { return !preg_match('/^(models|media)-/', basename($f)); });
 	usort($files, function ($a, $b) { return filemtime($b) - filemtime($a); });
 	$out = array();
 	foreach ( array_slice($files, 0, $limit) as $f ) {
