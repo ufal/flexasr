@@ -69,7 +69,8 @@ disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 - upload an audio file, or pick one from the corpus's `Audio/` folder, where the files are shown in sections by what is
   left to do: no TEITOK file yet, in progress, and already in a TEITOK file (found through the `<media url>` in
   the header of the `xmlfiles/`, with or without the `Audio/` prefix; whatever tool made that file);
-- choose the language, the mode (verbatim or clean) and whether restricted models may be offered;
+- start a file with its **Transcribe** button; on the next page choose the language, the mode (verbatim or
+  clean) and whether restricted models may be offered (the choices below refresh when you change them);
 - see which models the router would use and why, override them, and set the number of speakers;
 - start the pipeline as a background task, follow its log, and see recent tasks;
 - open the resulting `xmlfiles/<name>.xml` in TEITOK's waveform and text views, with the model, licence
@@ -82,11 +83,13 @@ sudo python3 teitok/install.py --shared /var/www/html/teitok/shared --user www-d
 ```
 
 ```xml
-<flexasr bin="/opt/flexasr/.venv/bin/flexasr" home="/opt/flexasr-home" models_dir="/data/models"/>
+<flexasr bin="/opt/flexasr/.venv/bin/flexasr" home="/opt/flexasr-home" models_dir="/data/models"
+         language="fra" restricted="1"/>
 ```
 
 `home` is a flexasr home (config, gated-model access) for the web server user; run `flexasr setup`
-for gated models with `FLEXASR_HOME` set to it. `admin="1"` limits starting tasks to admins.
+for gated models with `FLEXASR_HOME` set to it. `admin="1"` limits starting tasks to admins; `language` is the default language and `restricted="1"` offers
+restricted-licence models by default (for an academic corpus; the licence conditions are shown before a job starts).
 
 ## Adding a model or provider
 

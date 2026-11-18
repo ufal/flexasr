@@ -8,7 +8,9 @@
 //   index.php?action=flexasr&api=audio       JSON: the audio files, with their media keys and job status
 //   index.php?action=flexasr&api=media&step=start|next|result   the scan of xmlfiles/ for the media they use
 // Settings (settings.xml): <flexasr bin="/path/to/venv/bin/flexasr" home="/path/to/flexasr-home"
-//   models_dir="/big/disk/models" hf_home="..." admin="1"/>  (admin="1": only admins may run jobs)
+//   models_dir="/big/disk/models" hf_home="..." admin="1" language="fra" restricted="1"/>
+//   (admin="1": only admins may run jobs; language: default language; restricted="1": offer restricted-licence
+//   models by default, e.g. for an academic corpus, with the licence conditions shown before a job starts)
 
 check_login(getset('flexasr/admin') ? 'admin' : 'user');
 require_once(__DIR__.'/flexasr_lib.php');
@@ -40,12 +42,26 @@ if ( $_GET['api'] == 'status' ) {
 	if ( !$audio ) fatal('No such audio file in '.fa_h(fa_audio_folder()));
 	$lang = preg_replace('/[^A-Za-z_-]/', '', $_GET['lang'] ?: getset('flexasr/language', getset('defaults/language', '')));
 	$mode = $_GET['mode'] == 'clean' ? 'clean' : 'verbatim';
-	$allow = $_GET['restricted'] ? 1 : 0;
+	// restricted models: the project's default (settings.xml <flexasr restricted="1"/>) until the form says otherwise
+	$allow = isset($_GET['restricted']) ? ($_GET['restricted'] ? 1 : 0) : (getset('flexasr/restricted') ? 1 : 0);
 	$models = fa_models($lang, $mode, $allow);
 	$fid = fa_file_id($audio);
 
+	$modeopts = '';
+	foreach ( $fa_modes as $k => $v ) $modeopts .= "<option value='$k'".($k == $mode ? ' selected' : '').">$v</option>";
 	$maintext .= "<h1>{%Speech recognition}: ".fa_h(basename($audio))."</h1>
-		<audio src='".fa_h($audio)."' controls preload='none' style='width: 100%; max-width: 600px;'></audio>";
+		<audio src='".fa_h($audio)."' controls preload='none' style='width: 100%; max-width: 600px;'></audio>
+		<form action='index.php' method='get' id='fa-settings'>
+		<input type='hidden' name='action' value='$action'><input type='hidden' name='act' value='configure'>
+		<input type='hidden' name='audio' value='".fa_h($audio)."'>
+		<table>
+		<tr><th>{%Language}</th><td><input name='lang' value='".fa_h($lang)."' size='12' placeholder='fr / fra / French'>
+			<span style='font-size: smaller;'>{%empty: detect automatically}</span></td></tr>
+		<tr><th>{%Mode}</th><td><select name='mode' onchange='this.form.submit()'>$modeopts</select></td></tr>
+		<tr><th>{%Licences}</th><td><label><input type='hidden' name='restricted' value='0'><input type='checkbox' name='restricted' value='1'".($allow ? ' checked' : '')." onchange='this.form.submit()'>
+			{%also offer models with restricted licences (e.g. non-commercial use only)}</label></td></tr>
+		</table>
+		<p><input type='submit' value='{%Update the models}'></p></form><hr>";
 	if ( !$models ) {
 		$maintext .= "<p class='wrong'>{%flexasr could not be started on the server.}</p>";
 		if ( $user['permissions'] == 'admin' )
@@ -58,8 +74,7 @@ if ( $_GET['api'] == 'status' ) {
 		<input type='hidden' name='mode' value='$mode'>
 		<input type='hidden' name='restricted' value='$allow'>
 		<table>
-		<tr><th>{%Language}</th><td>".fa_h($models['language_name'] ?: '{%detect automatically}')."</td></tr>
-		<tr><th>{%Mode}</th><td>".$fa_modes[$mode]."</td></tr>";
+		<tr><th>{%Language}</th><td>".fa_h($models['language_name'] ?: '{%detect automatically}')."</td></tr>";
 	$notices = array();
 	foreach ( array('diarize' => '{%Speakers}', 'transcribe' => '{%Transcription}', 'align' => '{%Word times}') as $task => $label ) {
 		$choice = $models['choice'][$task];
@@ -216,9 +231,7 @@ if ( $_GET['api'] == 'status' ) {
 						var h = document.createElement('h3'); h.textContent = (g == 'todo' && !usage ? '{%Audio files}' : TITLES[g]) + ' (' + by[g].length + ')'; box.appendChild(h);
 						var T = document.createElement('table'); box.appendChild(T);
 						by[g].slice(0, limit[g]).forEach(function (a) {
-							var tr = document.createElement('tr'), td = document.createElement('td'), r = document.createElement('input');
-							r.type = 'radio'; r.name = 'audio'; r.value = a.p; r.required = true;
-							td.appendChild(r); tr.appendChild(td);
+							var tr = document.createElement('tr');
 							cell(tr, name(a));
 							td = document.createElement('td'); td.style.fontSize = 'smaller';
 							if ( g == 'running' ) td.textContent = a.j;
@@ -230,6 +243,15 @@ if ( $_GET['api'] == 'status' ) {
 								});
 								if ( ids(a).length > 5 ) td.appendChild(document.createTextNode(', …'));
 							} else if ( a.j == 'failed' ) td.textContent = '{%last run failed}';
+							tr.appendChild(td);
+							td = document.createElement('td');
+							if ( g != 'running' ) {
+								var b = document.createElement('a'); b.className = 'fa-go';
+								b.textContent = g == 'done' ? '{%Transcribe again}' : '{%Transcribe}';
+								b.href = 'index.php?action=$action&act=configure&audio=' + encodeURIComponent(a.p);
+								b.style.cssText = 'border: 1px solid #888; border-radius: 4px; padding: 1px 8px; text-decoration: none; white-space: nowrap;';
+								td.appendChild(b);
+							}
 							tr.appendChild(td); T.appendChild(tr);
 						});
 						if ( by[g].length > limit[g] ) {
@@ -256,20 +278,7 @@ if ( $_GET['api'] == 'status' ) {
 				json('$audiourl').then(function (d) { rows = d.audio; folder = d.folder; draw(); scan(); });
 			})();
 			</script>";
-		$lang = getset('flexasr/language', getset('defaults/language', ''));
-		$modeopts = '';
-		foreach ( $fa_modes as $k => $v ) $modeopts .= "<option value='$k'>$v</option>";
-		$maintext .= "<form action='index.php' method='get'>
-			<input type='hidden' name='action' value='$action'><input type='hidden' name='act' value='configure'>
-			<table>
-			<tr><th>{%Audio file}</th><td>$audiohtml</td></tr>
-			<tr><th>{%Language}</th><td><input name='lang' value='".fa_h($lang)."' size='10' placeholder='fr / fra / French'>
-				<span style='font-size: smaller;'>{%empty: detect automatically}</span></td></tr>
-			<tr><th>{%Mode}</th><td><select name='mode'>$modeopts</select></td></tr>
-			<tr><th>{%Licences}</th><td><label><input type='checkbox' name='restricted' value='1'>
-				{%also offer models with restricted licences (e.g. non-commercial use only)}</label></td></tr>
-			</table>
-			<p><input type='submit' value='{%Choose models}'></p></form>";
+		$maintext .= $audiohtml;
 	};
 	$maintext .= "<form action='index.php?action=upload&act=save' method='post' enctype='multipart/form-data'>
 		<input type='hidden' name='type' value='audio'><input type='hidden' name='submit' value='Save'>
