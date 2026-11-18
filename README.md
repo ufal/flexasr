@@ -28,8 +28,12 @@ records which model, revision and licence produced each layer.
 
 Verbatim transcription (fillers, repetitions, false starts) currently comes from CrisperWhisper 2.0
 (`pip install -e ".[crisperwhisper]"`). Its licence makes both the weights and **everything they
-produce** non-commercial, so flexasr uses it only with `--allow-restricted`, and the TEI header of the
-output says so. Without it, verbatim mode falls back to Whisper and warns that fillers may be lost.
+produce** non-commercial, so it is an optional install (never pulled in by the default install), flexasr
+uses it only with `--allow-restricted` (pip cannot show messages while installing, so the licence is shown
+before the first download and in `flexasr models`), and the TEI header of the output states the restriction
+(`<publicationStmt><availability status="restricted"><licence>…`). The same header note names any model
+whose licence differs from flexasr's own. For academic corpora this is normally no problem; check before
+any commercial use. Without it, verbatim mode falls back to Whisper and warns that fillers may be lost.
 
 The model entries live in the models repository shared with flexipipe
 ([ufal/flexipipe-models](https://github.com/ufal/flexipipe-models), `registries/asr/`), in the same

@@ -82,6 +82,22 @@ def _provider(stage: str, s: Settings, doc: Doc, progress: Callable[[str], None]
     return prov, rec
 
 
+def _run_record(s: Settings) -> dict:
+    """The settings that shape the output, kept in the document so the header can state them."""
+    import datetime
+
+    rec = {"date": datetime.date.today().isoformat(), "mode": s.mode, "allow_restricted": s.allow_restricted,
+           "split_gap": s.split_gap, "pause_min": s.pause_min}
+    if s.num_speakers or s.min_speakers or s.max_speakers:
+        rec["speakers_requested"] = {k: v for k, v in (("n", s.num_speakers), ("min", s.min_speakers),
+                                                       ("max", s.max_speakers)) if v}
+    if s.untokenized_roles:
+        rec["untokenized_roles"] = list(s.untokenized_roles)
+    if s.providers or s.models:
+        rec["overrides"] = {"providers": dict(s.providers), "models": dict(s.models)}
+    return rec
+
+
 def new_doc(path: str | Path, s: Settings) -> Doc:
     return Doc(audio=Audio(path=str(path)), language=langs.norm(s.language), mode=s.mode)
 
@@ -98,6 +114,7 @@ def run(path: str | Path, s: Settings, stages: tuple[str, ...] = ALL_STAGES, doc
     if s.language:
         doc.language = langs.norm(s.language)
     doc.mode = s.mode
+    doc.run.update(_run_record(s))
     wav = sr = None
     if NEEDS_AUDIO & set(stages):
         wav, sr = audio_io.load(doc.audio.path)

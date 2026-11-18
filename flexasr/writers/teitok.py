@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -55,7 +56,9 @@ def build(doc: Doc, enc: Optional[Encoding] = None, text_id: Optional[str] = Non
     hdr = ET.SubElement(tei, "teiHeader")
     fd = ET.SubElement(hdr, "fileDesc")
     ET.SubElement(ET.SubElement(fd, "titleStmt"), "title").text = stem
-    ET.SubElement(ET.SubElement(fd, "publicationStmt"), "p").text = "Transcribed with flexasr"
+    pub = ET.SubElement(fd, "publicationStmt")
+    ET.SubElement(pub, "p").text = "Transcribed with flexasr"
+    _licence_notes(pub, doc)
     if doc.speakers or doc.language:
         pd = ET.SubElement(hdr, "profileDesc")
         if doc.language:
@@ -66,7 +69,9 @@ def build(doc: Doc, enc: Optional[Encoding] = None, text_id: Optional[str] = Non
                 p = _set(ET.SubElement(lp, "person"), id=s.id, role=s.role, n=s.label)
                 if s.name:
                     ET.SubElement(p, "persName").text = s.name
-    ai = ET.SubElement(ET.SubElement(hdr, "encodingDesc"), "appInfo")
+    enc_desc = ET.SubElement(hdr, "encodingDesc")
+    _editorial(enc_desc, doc)
+    ai = ET.SubElement(enc_desc, "appInfo")
     _set(ET.SubElement(ai, "application"), ident="flexasr", version=__version__, type="pipeline")
     for p in doc.provenance:
         app = _set(ET.SubElement(ai, "application"), ident=p.provider, version=p.version, type=p.stage)
@@ -77,6 +82,11 @@ def build(doc: Doc, enc: Optional[Encoding] = None, text_id: Optional[str] = Non
         bits = [f"licence: {p.licence}"] if p.licence else []
         if p.restricted:
             bits.append("restricted: " + ", ".join(p.restricted))
+        st = p.settings or {}
+        if st.get("device"):
+            bits.append(f"device: {st['device']}")
+        if st.get("options"):
+            bits.append("options: " + json.dumps(st["options"], ensure_ascii=False, sort_keys=True))
         if bits:
             ET.SubElement(app, "desc").text = "; ".join(bits)
     rec = ET.SubElement(ET.SubElement(hdr, "recordingStmt"), "recording")
@@ -113,6 +123,55 @@ def build(doc: Doc, enc: Optional[Encoding] = None, text_id: Optional[str] = Non
                     wn += 1
     _indent(tei)
     return tei
+
+
+def _editorial(enc_desc: ET.Element, doc: Doc) -> None:
+    """How the transcription was made, in words: always written, whatever the licences are."""
+    r = doc.run or {}
+    ed = ET.SubElement(enc_desc, "editorialDecl")
+    lines = [f"Automatic transcription ({doc.mode} mode) of {Path(doc.audio.path).name}"
+             + (f", language {doc.language}" if doc.language else "")
+             + (f", {doc.audio.duration:.1f} s" if doc.audio.duration else "")
+             + (f", run on {r['date']}" if r.get("date") else "") + "."]
+    steps = [f"{p.stage}: {p.model or p.provider} ({p.provider}" + (f" {p.version}" if p.version else "") + ")"
+             for p in doc.provenance]
+    if steps:
+        lines.append("Stages and models: " + "; ".join(steps) + ".")
+    if r.get("speakers_requested"):
+        lines.append("Speakers requested: " + ", ".join(f"{k}={v}" for k, v in r["speakers_requested"].items()) + ".")
+    if doc.speakers:
+        lines.append(f"Speakers found: {len(doc.speakers)}.")
+    if r.get("untokenized_roles"):
+        lines.append("Roles transcribed without tokens: " + ", ".join(r["untokenized_roles"]) + ".")
+    if r:
+        lines.append(f"Utterances split at pauses of {r.get('split_gap')} s; pauses from {r.get('pause_min')} s "
+                     f"are marked; restricted models allowed: {'yes' if r.get('allow_restricted') else 'no'}.")
+    if r.get("overrides") and any(r["overrides"].values()):
+        lines.append("Router overridden: " + json.dumps(r["overrides"], ensure_ascii=False, sort_keys=True) + ".")
+    lines.append("The transcription is machine output and has not been corrected.")
+    for ln in lines:
+        ET.SubElement(ed, "p").text = ln
+
+
+def _licence_notes(pub: ET.Element, doc: Doc) -> None:
+    """Models whose licence differs from flexasr's own (MIT) are named in the header, and a restriction
+    on what they produce (e.g. non-commercial) is stated as a restriction on the file itself."""
+    notes = []
+    for p in doc.provenance:
+        if not p.licence or p.licence.lower() in ("n/a", "mit") or p.licence.startswith("MIT "):
+            continue
+        what = f"{p.stage} model {p.model or p.provider}"
+        if p.restricted:
+            notes.append(f"Restricted ({', '.join(p.restricted)}): this transcription was produced with the "
+                         f"{what}, licence {p.licence}; its licence limits how the output may be used.")
+        else:
+            notes.append(f"The {what} is used under licence {p.licence}.")
+    if notes:
+        av = ET.SubElement(pub, "availability")
+        if any(p.restricted for p in doc.provenance):
+            av.set("status", "restricted")
+        for n in notes:
+            ET.SubElement(av, "licence").text = n
 
 
 def _orig(w: Word) -> Optional[str]:

@@ -131,6 +131,7 @@ def main(argv=None):
             mark = "ok " if av.usable else "-- "
             where = f"on {av.device}" if av.usable else av.reason
             print(f"  {mark}{r.spec.name:16} {','.join(r.spec.tasks):12} {where}")
+        print("models keep their own licences; some are restricted (non-commercial): `flexasr models`")
         return 0
 
     if a.cmd == "models" and a.json:

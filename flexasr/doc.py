@@ -96,6 +96,7 @@ class Doc:
     pauses: list[Pause] = field(default_factory=list)
     provenance: list[Provenance] = field(default_factory=list)
     done: list[str] = field(default_factory=list)              # stages that ran, in order
+    run: dict[str, Any] = field(default_factory=dict)          # how it was run: settings, date (for the header)
     schema: str = SCHEMA
 
     # -- serialisation ---------------------------------------------------------------------------
@@ -121,6 +122,7 @@ class Doc:
             pauses=[Pause(**p) for p in d.get("pauses", [])],
             provenance=[Provenance(**p) for p in d.get("provenance", [])],
             done=list(d.get("done", [])),
+            run=dict(d.get("run", {})),
         )
 
     # -- helpers ---------------------------------------------------------------------------------
