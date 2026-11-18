@@ -117,7 +117,15 @@ if ( $_GET['api'] == 'status' ) {
 	};
 	$maintext .= "
 		<tr><th>{%Number of speakers}</th><td><input name='speakers' size='6' placeholder='2 / 2-4'> <span style='font-size: smaller;'>{%empty: estimate}</span></td></tr>
+		<tr><th>{%Interviewer}</th><td><select name='interviewer'><option value=''>{%none: everybody is tokenized}</option>
+			<option value='least'>{%the speaker who speaks least}</option><option value='first'>{%the first speaker}</option>
+			<option value='second'>{%the second speaker}</option><option value='most'>{%the speaker who speaks most}</option></select>
+			<span style='font-size: smaller;'>{%transcribed as text, without tokens}</span></td></tr>
 		<tr><th>{%Roles without tokens}</th><td><input name='untokenized' size='20' placeholder='interviewer'></td></tr>
+		<tr><th>{%Utterances}</th><td>{%split at pauses longer than} <input name='split_gap' value='2' size='4'> {%seconds}
+			<span style='font-size: smaller;'>({%smaller: more, shorter utterances})</span></td></tr>
+		<tr><th>{%Speaker changes}</th><td><label><input type='hidden' name='snap' value='0'><input type='checkbox' name='snap' value='1' checked>
+			{%move them to the nearest pause or sentence end (corrects words at the edge of a turn)}</label></td></tr>
 		<tr><th>{%Output file}</th><td>xmlfiles/<input name='fid' value='".fa_h($fid)."' size='30'>.xml
 			<label><input type='checkbox' name='overwrite' value='1'> {%replace if it exists}</label></td></tr>
 		</table>";
@@ -159,6 +167,9 @@ if ( $_GET['api'] == 'status' ) {
 		'allow_restricted' => $_POST['restricted'] ? true : false,
 		'speakers' => $speakers,
 		'untokenized' => preg_replace('/[^A-Za-z0-9_,-]/', '', $_POST['untokenized']),
+		'interviewer' => in_array($_POST['interviewer'], array('first', 'second', 'least', 'most')) ? $_POST['interviewer'] : '',
+		'split_gap' => is_numeric($_POST['split_gap']) ? max(0.2, min(120, (float)$_POST['split_gap'])) : 2.0,
+		'snap' => ($_POST['snap'] ?? '1') ? true : false,
 		'models' => $models,
 	);
 	if ( !fa_start($job) ) {

@@ -141,11 +141,17 @@ def _editorial(enc_desc: ET.Element, doc: Doc) -> None:
         lines.append("Speakers requested: " + ", ".join(f"{k}={v}" for k, v in r["speakers_requested"].items()) + ".")
     if doc.speakers:
         lines.append(f"Speakers found: {len(doc.speakers)}.")
+    iv = next((sp for sp in doc.speakers if sp.role == "interviewer"), None)
+    if r.get("interviewer") and iv:
+        lines.append(f"Interviewer: {iv.id} (chosen as the speaker who is {r['interviewer']}), transcribed without tokens.")
     if r.get("untokenized_roles"):
         lines.append("Roles transcribed without tokens: " + ", ".join(r["untokenized_roles"]) + ".")
     if r:
         lines.append(f"Utterances split at pauses of {r.get('split_gap')} s; pauses from {r.get('pause_min')} s "
                      f"are marked; restricted models allowed: {'yes' if r.get('allow_restricted') else 'no'}.")
+        if r.get("snap_shift"):
+            lines.append(f"Speaker changes were moved to the nearest pause or sentence end (at most {r['snap_shift']} s from "
+                         "where the diarizer put them).")
     if r.get("overrides") and any(r["overrides"].values()):
         lines.append("Router overridden: " + json.dumps(r["overrides"], ensure_ascii=False, sort_keys=True) + ".")
     lines.append("The transcription is machine output and has not been corrected.")

@@ -42,6 +42,9 @@ class Settings:
     speaker_map: dict[str, dict] = field(default_factory=dict)
     untokenized_roles: tuple[str, ...] = ()
     split_gap: float = 2.0
+    snap_boundaries: bool = True                          # speaker changes to the nearest pause / sentence end (snap.py)
+    snap_shift: float = 1.5
+    interviewer: Optional[str] = None                     # first | second | least | most: who is the interviewer
     pause_min: float = 0.3
     token: Optional[str] = None
     keep_dir: Optional[Path] = None                       # save the Doc after every stage
@@ -87,12 +90,15 @@ def _run_record(s: Settings) -> dict:
     import datetime
 
     rec = {"date": datetime.date.today().isoformat(), "mode": s.mode, "allow_restricted": s.allow_restricted,
-           "split_gap": s.split_gap, "pause_min": s.pause_min}
+           "split_gap": s.split_gap, "pause_min": s.pause_min,
+           "snap_shift": s.snap_shift if s.snap_boundaries else 0}
     if s.num_speakers or s.min_speakers or s.max_speakers:
         rec["speakers_requested"] = {k: v for k, v in (("n", s.num_speakers), ("min", s.min_speakers),
                                                        ("max", s.max_speakers)) if v}
     if s.untokenized_roles:
         rec["untokenized_roles"] = list(s.untokenized_roles)
+    if s.interviewer:
+        rec["interviewer"] = s.interviewer
     if s.providers or s.models:
         rec["overrides"] = {"providers": dict(s.providers), "models": dict(s.models)}
     return rec

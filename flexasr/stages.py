@@ -62,7 +62,8 @@ def tokens(doc: "Doc", s: "Settings", r: Run) -> None:
 def assign(doc: "Doc", s: "Settings", r: Run) -> None:
     if not (doc.turns or doc.turns_exclusive):
         raise RuntimeError("assign needs diarization turns (run the diarize stage)")
-    assign_speakers(doc, s.speaker_map, s.untokenized_roles, s.split_gap)
+    assign_speakers(doc, s.speaker_map, s.untokenized_roles, s.split_gap, snap=s.snap_boundaries, snap_shift=s.snap_shift,
+                    interviewer=s.interviewer)
     r.progress(f"assign: {len(doc.speakers)} speaker(s), {len(doc.utterances)} utterance(s)")
 
 

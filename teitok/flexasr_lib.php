@@ -387,6 +387,9 @@ function fa_run_args($job, $out) {
 	if ( $job['speakers'] ) { $a[] = '--speakers'; $a[] = $job['speakers']; };
 	if ( $job['allow_restricted'] ) $a[] = '--allow-restricted';
 	if ( $job['untokenized'] ) { $a[] = '--untokenized-roles'; $a[] = $job['untokenized']; };
+	if ( !empty($job['interviewer']) ) { $a[] = '--interviewer'; $a[] = $job['interviewer']; };
+	if ( isset($job['split_gap']) && abs($job['split_gap'] - 2.0) > 1e-9 ) { $a[] = '--split-gap'; $a[] = (string)$job['split_gap']; };
+	if ( isset($job['snap']) && !$job['snap'] ) $a[] = '--no-snap';
 	foreach ( $job['models'] as $stage => $model ) {
 		if ( $model ) { $a[] = '--model'; $a[] = "$stage=$model"; };
 	};

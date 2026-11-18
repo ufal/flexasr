@@ -69,7 +69,11 @@ disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 - upload an audio file, or pick one from the corpus's `Audio/` folder, where the files are shown in sections by what is
   left to do: no TEITOK file yet, in progress, and already in a TEITOK file (found through the `<media url>` in
   the header of the `xmlfiles/`, with or without the `Audio/` prefix; whatever tool made that file);
-- start a file with its **Transcribe** button; on the next page choose the language, the mode (verbatim or
+- start a file with its **Transcribe** button; the settings page also asks who the interviewer is (the speaker who
+  speaks least or most, or the first or second to speak: transcribed as text, without tokens), at which pauses to
+  split utterances (`--split-gap`), and whether to move speaker changes to the nearest pause or sentence end
+  (`--no-snap` turns that off; it corrects the words at the edge of a turn, which a diarizer places only roughly);
+  and on the next page choose the language, the mode (verbatim or
   clean) and whether restricted models may be offered (the choices below refresh when you change them);
 - see which models the router would use and why, override them, and set the number of speakers;
 - start the pipeline as a background task, follow its log, and see recent tasks (by the name of whoever started

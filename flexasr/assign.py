@@ -2,6 +2,7 @@
 
 Words get the speaker of the *exclusive* diarization turn they overlap most (one speaker at a time);
 the *full* turns (which may overlap) mark utterances that overlap someone else's speech, for review.
+Speaker changes are then moved to the nearest pause or sentence end (snap.py).
 A speaker map renames diarization labels and sets names and roles; roles listed as untokenized keep
 their text but get no ``<tok>``s in the output.
 """
@@ -11,6 +12,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .doc import Doc, Speaker, Turn, Utterance, Word
+from .snap import snap_speaker_changes
 
 
 def _overlap(a0: float, a1: float, b0: float, b1: float) -> float:
@@ -48,8 +50,33 @@ def speakers_from_turns(doc: Doc, speaker_map: Optional[dict] = None,
     doc.speakers = out
 
 
+def mark_interviewer(doc: Doc, words: list[Word], how: str) -> Optional[str]:
+    """Give the role ``interviewer`` (transcribed without tokens) to one speaker: the one who speaks ``least`` or
+    ``most`` (by the time of their words), or the ``first`` / ``second`` to appear. Returns the speaker id."""
+    if not doc.speakers:
+        return None
+    spoken = {s.id: 0.0 for s in doc.speakers}
+    for w in words:
+        if w.speaker in spoken and w.start is not None and w.end is not None:
+            spoken[w.speaker] += max(0.0, w.end - w.start)
+    if how == "first":
+        pick = doc.speakers[0]
+    elif how == "second":
+        pick = doc.speakers[1] if len(doc.speakers) > 1 else None
+    elif how in ("least", "most"):
+        order = sorted(doc.speakers, key=lambda s: spoken[s.id])
+        pick = order[0] if how == "least" else order[-1]
+    else:
+        raise ValueError(f"interviewer: first, second, least or most (not {how!r})")
+    if pick is None:
+        return None
+    pick.role, pick.tokenize = "interviewer", False
+    return pick.id
+
+
 def assign(doc: Doc, speaker_map: Optional[dict] = None, untokenized_roles: tuple[str, ...] = (),
-           split_gap: float = 2.0, overlap_min: float = 0.2) -> None:
+           split_gap: float = 2.0, overlap_min: float = 0.2, snap: bool = True, snap_shift: float = 1.5,
+           interviewer: Optional[str] = None) -> None:
     """Rebuild ``doc.utterances``: one per stretch of one speaker (split at gaps > ``split_gap`` s)."""
     speakers_from_turns(doc, speaker_map, untokenized_roles)
     by_label = {s.label: s.id for s in doc.speakers}
@@ -60,6 +87,10 @@ def assign(doc: Doc, speaker_map: Optional[dict] = None, untokenized_roles: tupl
         lab = _speaker_at(w, excl)
         w.speaker = by_label.get(lab, last) if lab else last
         last = w.speaker
+    if snap:
+        snap_speaker_changes(words, max_shift=snap_shift)      # speaker changes to the nearest pause / sentence end
+    if interviewer:
+        mark_interviewer(doc, words, interviewer)
     utts: list[Utterance] = []
     cur: Optional[Utterance] = None
     for w in words:

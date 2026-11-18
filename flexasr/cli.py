@@ -55,6 +55,7 @@ def _settings(a) -> Settings:
         providers=_kv(a.provider, "provider"), models=_kv(a.model, "model"), options=_opts(a.opt),
         num_speakers=num, min_speakers=mn, max_speakers=mx, speaker_map=smap,
         untokenized_roles=tuple(r for r in (a.untokenized_roles or "").split(",") if r),
+        split_gap=a.split_gap, snap_boundaries=not a.no_snap, snap_shift=a.snap_shift, interviewer=a.interviewer,
         keep_dir=Path(a.keep) if a.keep else None,
     )
 
@@ -66,6 +67,15 @@ def _common(p):
     p.add_argument("--speakers", help="number of speakers, or a range like 2-4")
     p.add_argument("--speaker-map", help="JSON: diarization label → {id, name, role}")
     p.add_argument("--untokenized-roles", help="roles transcribed without <tok>s, e.g. interviewer")
+    p.add_argument("--interviewer", choices=("first", "second", "least", "most"),
+                   help="which speaker is the interviewer (transcribed without <tok>s): the first or second to speak, or "
+                        "the one who speaks least / most")
+    p.add_argument("--split-gap", type=float, default=2.0, metavar="SECONDS",
+                   help="start a new utterance after a pause longer than this (default 2.0)")
+    p.add_argument("--no-snap", action="store_true",
+                   help="keep the diarizer's speaker changes as they are (default: move each to the nearest pause or sentence end)")
+    p.add_argument("--snap-shift", type=float, default=1.5, metavar="SECONDS",
+                   help="how far a speaker change may be moved (default 1.5)")
     p.add_argument("--provider", action="append", help="stage=provider (override the router)")
     p.add_argument("--model", action="append", help="stage=catalog-id (override the router)")
     p.add_argument("--opt", action="append", help="stage.key=value provider option (JSON values)")
