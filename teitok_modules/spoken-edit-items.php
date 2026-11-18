@@ -67,13 +67,19 @@
 	};
 
 	# The attribute changes that make the utterance's start and end those of its content (only when they differ)
-	function se_u_times ( $u, $items, $abs = false ) {
+	# The earliest start and the latest end among the items' own times: array(start, end), null where there are none
+	function se_items_span ( $items ) {
 		$s = null; $e = null;
 		foreach ( $items as $it ) {
 			if ( !$it['ts'] ) continue;
 			if ( $it['ts'][0] !== null ) $s = $s === null ? $it['ts'][0] : min($s, $it['ts'][0]);
 			if ( $it['ts'][1] !== null ) $e = $e === null ? $it['ts'][1] : max($e, $it['ts'][1]);
 		};
+		return array($s, $e);
+	};
+
+	function se_u_times ( $u, $items, $abs = false ) {
+		list($s, $e) = se_items_span($items);
 		$set = array();
 		foreach ( array("start" => $s, "end" => $e) as $k => $v ) {
 			if ( $v === null ) { if ( $abs ) $set[$k] = null; continue; };

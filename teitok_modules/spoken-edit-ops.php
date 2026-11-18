@@ -6,6 +6,7 @@
 
 	require_once(__DIR__ . "/spoken-edit-doc.php");
 	require_once(__DIR__ . "/spoken-edit-items.php");
+	require_once(__DIR__ . "/spoken-edit-estimate.php");
 
 	# operation => whether it only rearranges the words (so that the text of the document must come out the same)
 	function se_op_table () {
@@ -80,7 +81,12 @@
 		list($items, $trail) = se_items($doc, $u); list($pitems, $ptrail) = se_items($doc, $p);
 		$i = se_item_index($items, $a); $ctr = se_id_counter($doc, "tok", "w-");
 		$new = se_join($pitems, se_adapt(array_slice($items, 0, $i + 1), $pitems, $ctr));
-		return array(se_u_replace($doc, $p, $new, $ptrail), se_u_replace($doc, $u, array_slice($items, $i + 1), $trail));
+		$pset = array(); $uset = array();
+		if ( se_untimed_words($u, $items) && se_untimed_words($p, $pitems) && ($cut = se_estimate_cut($u, $items, $i + 1)) !== null ) {
+			$pset = array("end" => sprintf("%.3f", $cut), "timing" => "estimated");       # the moved words end where the cut falls
+			$uset = array("start" => sprintf("%.3f", $cut), "timing" => "estimated");
+		};
+		return array(se_u_replace($doc, $p, $new, $ptrail, $pset), se_u_replace($doc, $u, array_slice($items, $i + 1), $trail, $uset));
 	};
 
 	function se_op_move_next ( $doc, $a ) {
@@ -89,7 +95,12 @@
 		list($items, $trail) = se_items($doc, $u); list($nitems, $ntrail) = se_items($doc, $n);
 		$i = se_item_index($items, $a); $ctr = se_id_counter($doc, "tok", "w-");
 		$new = se_join(se_adapt(array_slice($items, $i), $nitems, $ctr), $nitems);
-		return array(se_u_replace($doc, $n, $new, $ntrail), se_u_replace($doc, $u, array_slice($items, 0, $i), $trail));
+		$nset = array(); $uset = array();
+		if ( se_untimed_words($u, $items) && se_untimed_words($n, $nitems) && ($cut = se_estimate_cut($u, $items, $i)) !== null ) {
+			$uset = array("end" => sprintf("%.3f", $cut), "timing" => "estimated");       # what stays ends where the cut falls
+			$nset = array("start" => sprintf("%.3f", $cut), "timing" => "estimated");
+		};
+		return array(se_u_replace($doc, $n, $new, $ntrail, $nset), se_u_replace($doc, $u, array_slice($items, 0, $i), $trail, $uset));
 	};
 
 	function se_op_split ( $doc, $a ) {
@@ -102,8 +113,13 @@
 		$raw = $doc['raw']; $b = $u->s;
 		while ( $b > 0 && strpos(" \t\r\n", $raw[$b - 1]) !== false ) $b--;
 		$ind = substr($raw, $b, $u->s - $b);
-		$new = se_u_raw($doc, $u, $tail, $trail, array("id" => se_new_id($uc)) + se_u_times($u, $tail, true));
-		return array(array($u->s, $u->e, se_u_raw($doc, $u, $head, $trail, se_u_times($u, $head)) . $ind . $new));
+		$hset = se_u_times($u, $head); $tset = se_u_times($u, $tail, true);
+		if ( se_untimed_words($u, $items) && ($cut = se_estimate_cut($u, $items, $i)) !== null ) {     # no word times: estimate the cut
+			$hset = array("end" => sprintf("%.3f", $cut), "timing" => "estimated");
+			$tset = array("start" => sprintf("%.3f", $cut), "end" => $u->attrs['end'], "timing" => "estimated");
+		};
+		$new = se_u_raw($doc, $u, $tail, $trail, array("id" => se_new_id($uc)) + $tset);
+		return array(array($u->s, $u->e, se_u_raw($doc, $u, $head, $trail, $hset) . $ind . $new));
 	};
 
 	function se_op_merge ( $doc, $a ) {
@@ -116,6 +132,16 @@
 		$all = se_join($items, se_adapt($nitems, $items, $ctr));
 		$all[0]['lead'] = "";
 		$set = se_u_times($u, $all);
+		# where the words have no times (the utterances do), the merged utterance runs from the earlier start to the later end
+		list($ws, $we) = se_items_span($all);
+		foreach ( array("start" => array($ws, "min"), "end" => array($we, "max")) as $name => $how ) {
+			if ( $how[0] !== null ) continue;
+			$c = array();
+			foreach ( array($u, $n) as $x ) if ( isset($x->attrs[$name]) && is_numeric($x->attrs[$name]) ) $c[] = (float)$x->attrs[$name];
+			if ( !$c ) continue;
+			$v = $how[1] === "min" ? min($c) : max($c); $old = $u->attrs[$name] ?? null;
+			if ( $old === null || !is_numeric($old) || abs((float)$old - $v) > 0.0005 ) $set[$name] = sprintf("%.3f", $v);
+		};
 		return array(array($u->s, $n->e, se_u_raw($doc, $u, $all, $ntrail, $set)));
 	};
 

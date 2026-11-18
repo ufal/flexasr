@@ -1,4 +1,4 @@
-// spoken-edit: the page: toolbar, speakers, and what each key does
+// spoken-edit: the page: toolbar, speakers, and what each key does (the actions and keys window: spoken-edit-palette.js)
 var SE = window.SE = window.SE || {};
 SE.main = (function () {
 	var busy = false, cfg, app, bar, msg, list, ask, speakersBox, counter, lowIdx = -1, undoB, redoB, saveB;
@@ -23,6 +23,7 @@ SE.main = (function () {
 		var d = data(), n = SE.model.dirty();
 		undoB.disabled = !SE.model.canUndo(); redoB.disabled = !SE.model.canRedo();
 		saveB.textContent = n ? "Save (" + n + ")" : "Save"; saveB.classList.toggle("se-dirty", n > 0); saveB.disabled = !n || !cfg.canwrite;
+		if ( SE.palette ) SE.palette.sync({ undo: SE.model.canUndo(), redo: SE.model.canRedo(), save: n > 0 && !!cfg.canwrite });
 		var low = SE.view.uncertainList(); counter.textContent = d.hasconf ? low.length + " uncertain" : "";
 		drawSpeakers();
 	}
@@ -112,6 +113,15 @@ SE.main = (function () {
 		},
 		playUtt: function () { var u = curU(); if ( u && u.s !== null && SE.audio.available() ) SE.audio.playFrom(u.s, u.e); },
 		stop: function () { SE.audio.stop(); say(""); },
+		// the waveform editor (TEITOK's wavesurfer) opened at the word under the cursor: where the times of words and
+		// utterances are dragged into place; it edits the saved file, so the edits here have to be saved first
+		adjust: function () {
+			if ( !cfg.waveedit ) return say("Log in to adjust the times.", "error");
+			if ( SE.model.dirty() ) return say("Save first (Ctrl/⌘ S), then adjust the times.", "info");
+			var u = curU(), c = SE.view.cursor(), it = u && u.items[c.i], id = it && it.id;
+			if ( !id && u ) { var f = u.items.filter(function ( x ) { return x.id; })[0]; id = f && f.id; }
+			window.location.href = cfg.waveedit + (id ? "&jmp=" + encodeURIComponent(id) : "");
+		},
 		undo: function () { SE.model.undo().then(function () { SE.view.render(); refresh(); }, function ( e ) { say(e.message, "error"); }); },
 		redo: function () { SE.model.redo().then(function () { SE.view.render(); refresh(); }, function ( e ) { say(e.message, "error"); }); },
 		save: function () {
@@ -120,7 +130,7 @@ SE.main = (function () {
 			say("Saving…", "info");
 			SE.model.save().then(function () { SE.view.render(); refresh(); say("Saved.", "ok"); }, function ( e ) { say(e.message, "error"); });
 		},
-		help: function () { var h = app.querySelector(".se-help"); if ( h ) h.remove(); else app.insertBefore(SE.keys.help(), list); }
+		help: function () { if ( SE.palette ) SE.palette.toggle(); }
 	};
 	for ( var n = 1; n <= 9; n++ ) (function ( n ) { actions["who" + n] = function () { whoNumber(n); }; })(n);
 
@@ -157,6 +167,8 @@ SE.main = (function () {
 		actions: actions,
 		init: function ( c, d ) {
 			cfg = c; app = document.getElementById("se-app"); SE.model.init(c, d);
+			// first of all, so that nothing that goes wrong later takes the protection away: leaving with unsaved edits asks
+			window.addEventListener("beforeunload", function ( ev ) { if ( SE.model.dirty() ) { ev.preventDefault(); ev.returnValue = ""; return ""; } });
 			bar = el("div", "se-bar"); msg = el("div", "se-msg"); ask = el("div", "se-ask"); ask.hidden = true; list = el("div", "se-list");
 			undoB = button("Undo", "Ctrl/⌘ Z", actions.undo); redoB = button("Redo", "Ctrl/⌘ Shift Z", actions.redo); saveB = button("Save", "Ctrl/⌘ S", actions.save);
 			bar.appendChild(undoB); bar.appendChild(redoB); bar.appendChild(saveB);
@@ -171,11 +183,15 @@ SE.main = (function () {
 				var lab = el("label", "", "uncertain below "), th = el("input"); th.type = "number"; th.min = 0; th.max = 1; th.step = 0.05; th.value = c.lowconf; th.style.width = "4.5em";
 				th.addEventListener("change", function () { SE.view.lowconf(parseFloat(th.value) || 0); lowIdx = -1; SE.view.render(); refresh(); });
 				lab.appendChild(th); bar.appendChild(lab); counter = el("span", "se-count"); bar.appendChild(counter);
-				bar.appendChild(button("‹", "previous uncertain word (C)", actions.prevLow)); bar.appendChild(button("›", "next uncertain word (c)", actions.nextLow));
 			} else counter = el("span");
 			bar.appendChild(el("span", "se-grow"));
 			var w = el("a", "", "waveform view"); w.href = c.wave; bar.appendChild(w);
-			bar.appendChild(button("?", "keys", actions.help));
+			if ( c.waveedit ) { var we = el("a", "", "adjust times"); we.href = c.waveedit; we.title = "the waveform editor: drag the boundaries of the words and utterances"; bar.appendChild(we); }
+			var palB = !SE.palette ? null : SE.palette.init({
+				run: function ( a ) { if ( !busy && actions[a] ) actions[a](); }, focus: function () { app.focus(); },
+				speakers: function () { return data().speakers.map(function ( p ) { return p.id; }); }, audio: !!c.audio, hasconf: !!d.hasconf
+			});
+			if ( palB ) bar.appendChild(palB);      // without the palette script the keys still work
 			speakersBox = el("details", "se-speakers"); speakersBox.appendChild(el("summary", "", "Speakers"));
 			var spkBody = el("div"); speakersBox.appendChild(spkBody);
 			app.appendChild(bar); app.appendChild(msg); app.appendChild(ask); app.appendChild(speakersBox); app.appendChild(list);
@@ -195,7 +211,6 @@ SE.main = (function () {
 			var guarded = {};
 			Object.keys(actions).forEach(function ( k ) { guarded[k] = function ( ev ) { if ( !busy ) actions[k](ev); }; });
 			SE.keys.bind(guarded);
-			window.addEventListener("beforeunload", function ( ev ) { if ( SE.model.dirty() ) { ev.preventDefault(); ev.returnValue = ""; } });
 			setInterval(function () { fetch(cfg.base + "&act=ping", { credentials: "same-origin" }).catch(function () {}); }, 600000);
 			SE.view.render(); SE.view.setCursor(0, 0, true); refresh(); app.focus();
 			var low = SE.view.uncertainList(); if ( low.length ) say(low.length + " uncertain words: press c to go through them, least certain first.", "info");

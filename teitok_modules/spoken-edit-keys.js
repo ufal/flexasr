@@ -5,7 +5,7 @@ SE.keys = (function () {
 	var TABLE = [
 		["ArrowRight", "right", "next word"], ["ArrowLeft", "left", "previous word"],
 		["ArrowDown", "down", "next utterance"], ["ArrowUp", "up", "previous utterance"],
-		["Home", "home", "first word of the utterance"], ["End", "end", "last word of the utterance"],
+		["PageUp", "home", "first word of the utterance"], ["PageDown", "end", "last word of the utterance"],
 		["[", "movePrev", "move this word and everything before it to the previous utterance"],
 		["]", "moveNext", "move this word and everything after it to the next utterance"],
 		["s", "split", "split the utterance before this word"],
@@ -18,10 +18,11 @@ SE.keys = (function () {
 		["i", "insertBefore", "insert a word before"], ["o", "insertAfter", "insert a word after"],
 		["-", "join", "join this word with the next"],
 		[" ", "play", "play / pause from this word"], ["p", "playUtt", "play this utterance"], ["Escape", "stop", "stop"],
+		["w", "adjust", "adjust the times in the waveform editor, at this word (save first)"],
 		["c", "nextLow", "next uncertain word (least certain first)"], ["C", "prevLow", "previous uncertain word"],
 		["a", "accept", "accept this word as correct and go to the next uncertain one"],
 		["mod+z", "undo", "undo"], ["mod+shift+z", "redo", "redo"], ["mod+y", "redo", ""], ["mod+s", "save", "save"],
-		["?", "help", "this list"]
+		["?", "help", "the actions and keys window"]
 	];
 	function name ( ev ) {
 		var k = ev.key;
@@ -43,16 +44,13 @@ SE.keys = (function () {
 				actions[act](ev);
 			});
 		},
-		help: function () {
-			var d = document.createElement("div"); d.className = "se-help";
-			var h = document.createElement("table");
-			TABLE.forEach(function ( row ) {
-				if ( !row[2] ) return;
-				var tr = h.insertRow(); var k = tr.insertCell(); var kb = document.createElement("kbd");
-				kb.textContent = row[0] === " " ? "Space" : row[0].replace("mod+", "Ctrl/⌘ "); k.appendChild(kb); tr.insertCell().textContent = row[2];
-			});
-			d.appendChild(h);
-			return d;
-		}
+		// the first key bound to an action, and its description: { key, text } (for the palette)
+		info: function ( action ) {
+			var r = null;
+			TABLE.forEach(function ( row ) { if ( !r && row[1] === action && row[2] ) r = { key: row[0], text: row[2] }; });
+			return r;
+		},
+		// a key as shown to people: "mod+z" -> "Ctrl/⌘ z", " " -> "Space"
+		label: function ( key ) { return key === " " ? "Space" : key.replace("mod+", "Ctrl/⌘ ").replace("shift+", "Shift "); }
 	};
 })();

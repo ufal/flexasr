@@ -43,12 +43,13 @@
 	$media = $model['media'];
 	if ( $media && !preg_match('#^(https?:)?//#', $media) && strpos($media, "/") === false ) $media = ($se['media'] ?? "Audio") . "/" . $media;
 	$cfg = array("cid" => $cid, "base" => "index.php?action=$action&cid=" . rawurlencode($cid), "audio" => $media,
-		"lowconf" => (float)($se['lowconf'] ?? 0.7), "canwrite" => $username ? 1 : 0, "wave" => "index.php?action=wavesurfer&cid=" . rawurlencode($cid));
+		"lowconf" => (float)($se['lowconf'] ?? 0.7), "canwrite" => $username ? 1 : 0, "wave" => "index.php?action=wavesurfer&cid=" . rawurlencode($cid),
+		"waveedit" => $username ? "index.php?action=wavesurfer&act=edit&cid=" . rawurlencode(preg_match('/\.xml$/i', $cid) ? $cid : "$cid.xml") : "");
 	$cfgjson = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
 	$modeljson = json_encode($model, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE);
 
 	$scripts = "";
-	foreach ( array("model", "audio", "view", "keys", "main") as $part )
+	foreach ( array("model", "audio", "view", "keys", "palette", "main") as $part )
 		$scripts .= "<script src=\"" . htmlspecialchars(se_asset("spoken-edit-$part.js"), ENT_QUOTES) . "\"></script>\n";
 	$cssurl = se_asset("spoken-edit.css", "spoken-edit-main.js");
 
