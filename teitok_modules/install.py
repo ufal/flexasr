@@ -5,13 +5,13 @@ TEITOK looks for an action's page in the project's Sources/, then in the shared 
 then in TEITOK's own common/Sources/, so files placed in the shared project work in every corpus
 without touching the TEITOK checkout (as flexicorp's install-teitok-ui.pl does):
 
-    teitok/*.php (not *-test.php)  ->  SHARED/Sources/
+    teitok_modules/*.php (not *-test.php)  ->  SHARED/Sources/
 
 Re-running upgrades in place. A manifest (SHARED/Resources/flexasr-teitok.json) records what was
 installed, with checksums; a file changed locally since the last install (or there before the first)
 is kept as FILE.local-YYYYmmdd-HHMMSS before it is replaced.
 
-    sudo python3 teitok/install.py [--shared DIR] [--user USER] [--dry-run]
+    sudo python3 teitok_modules/install.py [--shared DIR] [--user USER] [--dry-run]
 
 Then point the module at flexasr in the corpus (or shared) settings.xml:
     <flexasr bin="/path/to/venv/bin/flexasr" home="/path/to/flexasr-home" models_dir="/big/disk/models"/>

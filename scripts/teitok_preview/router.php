@@ -15,7 +15,7 @@ function fatal($m) { print "<p style='color: #b00;'>$m</p>"; exit(1); }
 $action = $_GET['action'] ?? 'flexasr'; $act = $_GET['act'] ?? '';
 $username = 'preview@example.org'; $user = array('permissions' => 'admin', 'fullname' => 'Preview User'); $maintext = '';
 chdir(getenv('FA_PREVIEW_PROJ'));
-include(__DIR__.'/../../teitok/flexasr.php');
+include(__DIR__.'/../../teitok_modules/flexasr.php');
 $maintext = preg_replace('/\{%([^}]*)\}/', '$1', $maintext);      // TEITOK translates {%text}; here: the English text
 print "<!doctype html><meta charset=utf-8><title>flexasr preview</title>
 <body style='font-family: sans-serif; margin: 1.5em;'><p style='color: #777; font-size: smaller;'>

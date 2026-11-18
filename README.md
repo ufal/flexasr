@@ -64,7 +64,7 @@ disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 
 ## In TEITOK
 
-`teitok/` holds a TEITOK module (`index.php?action=flexasr`). In it, project members can:
+`teitok_modules/` holds a TEITOK module (`index.php?action=flexasr`). In it, project members can:
 
 - upload an audio file, or pick one from the corpus's `Audio/` folder, where the files are shown in sections by what is
   left to do: no TEITOK file yet, in progress, and already in a TEITOK file (found through the `<media url>` in
@@ -91,7 +91,7 @@ disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 Install it into the TEITOK shared project and tell it where flexasr is:
 
 ```bash
-sudo python3 teitok/install.py --shared /var/www/html/teitok/shared --user www-data
+sudo python3 teitok_modules/install.py --shared /var/www/html/teitok/shared --user www-data
 ```
 
 ```xml
