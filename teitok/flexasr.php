@@ -5,8 +5,8 @@
 //   index.php?action=flexasr&act=run         start (POST)
 //   index.php?action=flexasr&act=job&job=ID  progress, log and result
 //   index.php?action=flexasr&api=status&job=ID   JSON for the progress page
-//   index.php?action=flexasr&api=audio       JSON: the audio files, with their media keys and job status
-//   index.php?action=flexasr&api=media&step=start|next|result   the scan of xmlfiles/ for the media they use
+//   index.php?action=flexasr&api=audio&status=todo|running|done|all&q=TEXT&offset=N&limit=N   one page of audio files
+//   index.php?action=flexasr&api=media&step=start|next   the scan of xmlfiles/ for the media they use (steps)
 // Settings (settings.xml): <flexasr bin="/path/to/venv/bin/flexasr" home="/path/to/flexasr-home"
 //   models_dir="/big/disk/models" hf_home="..." admin="1" language="fra" restricted="1"/>
 //   (admin="1": only admins may run jobs; language: default language; restricted="1": offer restricted-licence
@@ -27,22 +27,33 @@ if ( $_GET['api'] == 'status' ) {
 
 } else if ( $_GET['api'] == 'audio' ) {
 	header('Content-Type: application/json');
-	print json_encode(array('folder' => fa_audio_folder(), 'audio' => fa_audio_list()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+	$status = in_array($_GET['status'], array('todo', 'running', 'done', 'all')) ? $_GET['status'] : 'todo';
+	$page = fa_audio_page($status, $_GET['q'], $_GET['offset'], $_GET['limit'] ?: 100);
+	$page['admin'] = $user['permissions'] == 'admin';
+	print json_encode($page, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 	exit;
 
 } else if ( $_GET['api'] == 'media' ) {
 	header('Content-Type: application/json');
-	$step = $_GET['step'];
-	if ( $step == 'result' ) print json_encode(array('usage' => (object)fa_media_usage()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-	else print json_encode(fa_media_scan($step == 'start' ? 'start' : 'next'));
+	print json_encode(fa_media_scan($_GET['step'] == 'start' ? 'start' : 'next'));
+	exit;
+
+} else if ( $act == 'stop' ) {
+	if ( $user['permissions'] != 'admin' ) fatal('Only an administrator can stop a task');
+	$audio = fa_audio_path($_POST['audio'] ?? '');
+	if ( !$audio || $_SERVER['REQUEST_METHOD'] != 'POST' ) fatal('No such audio file');
+	$job = fa_lock_info($audio);
+	if ( $job ) fa_stop_job($job);
+	fa_lock_release($audio);              // also when there was no process left: a dead task must not keep the file
+	header("Location: index.php?action=$action");
 	exit;
 
 } else if ( $act == 'configure' ) {
 	$audio = fa_audio_path($_GET['audio']);
 	if ( !$audio ) fatal('No such audio file in '.fa_h(fa_audio_folder()));
-	if ( $active = fa_active_job($audio) ) {
+	if ( $active = fa_lock_info($audio) ) {
 		$maintext .= "<h1>{%Speech recognition}: ".fa_h(basename($audio))."</h1><p>{%This file is already being processed} ("
-			.fa_h($active['status']).", ".fa_h($active['user']).", ".fa_h(str_replace('T', ' ', substr($active['started'], 0, 16))).").</p>
+			.fa_h($active['status']).", ".fa_h(fa_who($active)).", ".fa_h(str_replace('T', ' ', substr($active['started'], 0, 16))).").</p>
 			<p><a href='index.php?action=$action&act=job&job=".urlencode($active['id'])."'>{%Follow the task}</a> &middot;
 			<a href='index.php?action=$action'>{%back}</a></p>";
 		return;
@@ -120,17 +131,13 @@ if ( $_GET['api'] == 'status' ) {
 	$fid = fa_file_id($_POST['fid'] ?: $audio);
 	if ( !$fid ) fatal('No valid output file name');
 	$output = "xmlfiles/$fid.xml";
-	$lock = fopen(fa_jobdir().'/start.lock', 'c');     // check and start as one step: no double start from a double click
-	if ( $lock ) flock($lock, LOCK_EX);
-	if ( $active = fa_active_job($audio, $output) ) {
-		if ( $lock ) fclose($lock);
+	if ( $active = fa_lock_info($audio) ?: fa_output_job($output) ) {
 		$maintext .= "<h1>{%Speech recognition}</h1><p class='wrong'>{%This file is already being processed} ("
-			.fa_h($active['status']).", ".fa_h($active['user']).").</p>
+			.fa_h($active['status']).", ".fa_h(fa_who($active)).").</p>
 			<p><a href='index.php?action=$action&act=job&job=".urlencode($active['id'])."'>{%Follow the task}</a></p>";
 		return;
 	};
 	if ( file_exists($output) && !$_POST['overwrite'] ) {
-		if ( $lock ) fclose($lock);
 		$maintext .= "<h1>{%Speech recognition}</h1><p class='wrong'>".fa_h($output)." {%already exists}.</p>
 			<p><a href='javascript:history.back()'>{%back}</a></p>";
 		return;
@@ -143,7 +150,7 @@ if ( $_GET['api'] == 'status' ) {
 	$speakers = preg_match('/^\d+(-\d+)?$/', $_POST['speakers']) ? $_POST['speakers'] : '';
 	$job = array(
 		'id' => date('Ymd-His').'-'.substr(md5(uniqid('', true)), 0, 6),
-		'user' => $username, 'started' => date('c'),
+		'user' => $username, 'name' => trim($user['fullname'] ?: ($user['short'] ?: $username)), 'started' => date('c'),
 		'audio' => $audio, 'output' => $output, 'fid' => $fid,
 		'lang' => preg_replace('/[^A-Za-z_-]/', '', $_POST['lang']),
 		'mode' => $_POST['mode'] == 'clean' ? 'clean' : 'verbatim',
@@ -152,8 +159,11 @@ if ( $_GET['api'] == 'status' ) {
 		'untokenized' => preg_replace('/[^A-Za-z0-9_,-]/', '', $_POST['untokenized']),
 		'models' => $models,
 	);
-	fa_start($job);
-	if ( $lock ) fclose($lock);
+	if ( !fa_start($job) ) {
+		$maintext .= "<h1>{%Speech recognition}</h1><p class='wrong'>{%This file is already being processed}.</p>
+			<p><a href='index.php?action=$action'>{%back}</a></p>";
+		return;
+	};
 	header("Location: index.php?action=$action&act=job&job=".$job['id']);
 	print "<script>top.location='index.php?action=$action&act=job&job=".$job['id']."';</script>";
 	exit;
@@ -163,7 +173,7 @@ if ( $_GET['api'] == 'status' ) {
 	if ( !$job ) fatal('No such task');
 	$id = $job['id'];
 	$maintext .= "<h1>{%Speech recognition}: ".fa_h(basename($job['audio']))."</h1>
-		<p>{%Started} ".fa_h($job['started'])." {%by} ".fa_h($job['user'])
+		<p>{%Started} ".fa_h($job['started'])." {%by} ".fa_h(fa_who($job))
 		." &middot; ".fa_h($job['lang'] ?: 'auto')." &middot; ".fa_h($job['mode'])
 		.($job['allow_restricted'] ? " &middot; {%restricted models allowed}" : '')."</p>
 		<p>{%Status}: <b id='fa-status'>".fa_h($job['status'])."</b></p>";
@@ -221,49 +231,52 @@ if ( $_GET['api'] == 'status' ) {
 	} else {
 		$audiourl = "index.php?action=$action&api=audio";
 		$mediaurl = "index.php?action=$action&api=media";
-		$audiohtml = "<div id='fa-audio-bar'><input id='fa-search' placeholder='{%search}' size='20'>
+		$maintext .= "<div id='fa-audio-bar'><input id='fa-search' placeholder='{%search}' size='20'>
 			<span id='fa-scan' style='font-size: smaller; color: #777;'></span></div>
 			<div id='fa-audio-sections'></div>
 			<script>
 			(function () {
-				var rows = [], usage = null, folder = '', limit = {todo: 200, running: 200, done: 200};
+				var PAGE = 100, checking = true, admin = false, folder = '', timer = null;
+				var SEC = {todo: {items: [], n: 0}, running: {items: [], n: 0}, done: {items: [], n: 0}};
 				var box = document.getElementById('fa-audio-sections'), S = document.getElementById('fa-search');
 				var TITLES = {todo: '{%No TEITOK file yet}', running: '{%In progress}', done: '{%Already in a TEITOK file}'};
-				function ids(a) { var u = usage && usage[a.k]; return u ? u : []; }
-				function status(a) {
-					if ( a.j == 'queued' || a.j == 'running' ) return 'running';
-					if ( !usage ) return 'todo';
-					return ids(a).length ? 'done' : 'todo';
-				}
-				function name(a) { return a.p.substring(folder.length + 1); }
+				function json(u, opt) { return fetch(u, opt).then(function (r) { return r.json(); }); }
 				function cell(tr, text) { var td = document.createElement('td'); td.textContent = text; tr.appendChild(td); return td; }
+				function name(a) { return a.p.substring(folder.length + 1); }
+				function stopform(a) {
+					var f = document.createElement('form'); f.method = 'post'; f.action = 'index.php?action=$action&act=stop';
+					f.style.display = 'inline'; f.onsubmit = function () { return confirm('{%Stop this task and release the file?}'); };
+					var h = document.createElement('input'); h.type = 'hidden'; h.name = 'audio'; h.value = a.p; f.appendChild(h);
+					var b = document.createElement('input'); b.type = 'submit'; b.value = '{%Stop}'; f.appendChild(b);
+					return f;
+				}
+				function note(g, a) {
+					var td = document.createElement('td'); td.style.fontSize = 'smaller';
+					if ( g == 'running' ) { td.textContent = a.j + ' '; if ( admin ) td.appendChild(stopform(a)); }
+					else if ( g == 'done' ) {
+						a.x.forEach(function (id, i) {
+							if ( i ) td.appendChild(document.createTextNode(', '));
+							var l = document.createElement('a'); l.textContent = id;
+							l.href = 'index.php?action=wavesurfer&cid=' + encodeURIComponent(id); td.appendChild(l);
+						});
+						if ( a.xn > a.x.length ) td.appendChild(document.createTextNode(', …'));
+					} else if ( a.j == 'failed' ) td.textContent = '{%last run failed}';
+					else if ( a.j == 'cancelled' ) td.textContent = '{%last run was stopped}';
+					else if ( a.j == 'stalled' ) td.textContent = '{%last run did not finish}';
+					return td;
+				}
 				function draw() {
-					var q = S.value.toLowerCase(), by = {todo: [], running: [], done: []};
-					rows.forEach(function (a) {
-						if ( q && name(a).toLowerCase().indexOf(q) < 0 ) return;
-						by[status(a)].push(a);
-					});
 					box.innerHTML = '';
 					['todo', 'running', 'done'].forEach(function (g) {
-						if ( !by[g].length && g != 'todo' ) return;
-						var h = document.createElement('h3'); h.textContent = (g == 'todo' && !usage ? '{%Audio files}' : TITLES[g]) + ' (' + by[g].length + ')'; box.appendChild(h);
+						var sec = SEC[g];
+						if ( !sec.n && g != 'todo' ) return;
+						var h = document.createElement('h3');
+						h.textContent = (g == 'todo' && checking ? '{%Audio files}' : TITLES[g]) + ' (' + sec.n + ')'; box.appendChild(h);
 						var T = document.createElement('table'); box.appendChild(T);
-						by[g].slice(0, limit[g]).forEach(function (a) {
+						sec.items.forEach(function (a) {
 							var tr = document.createElement('tr');
-							cell(tr, name(a));
-							td = document.createElement('td'); td.style.fontSize = 'smaller';
-							if ( g == 'running' ) td.textContent = a.j;
-							else if ( g == 'done' ) {
-								ids(a).slice(0, 5).forEach(function (id, i) {
-									if ( i ) td.appendChild(document.createTextNode(', '));
-									var l = document.createElement('a'); l.textContent = id;
-									l.href = 'index.php?action=wavesurfer&cid=' + encodeURIComponent(id); td.appendChild(l);
-								});
-								if ( ids(a).length > 5 ) td.appendChild(document.createTextNode(', …'));
-							} else if ( a.j == 'failed' ) td.textContent = '{%last run failed}';
-							else if ( a.j == 'stalled' ) td.textContent = '{%last run did not finish}';
-							tr.appendChild(td);
-							td = document.createElement('td');
+							cell(tr, name(a)); tr.appendChild(note(g, a));
+							var td = document.createElement('td');
 							if ( g != 'running' ) {
 								var b = document.createElement('a'); b.className = 'fa-go';
 								b.textContent = g == 'done' ? '{%Transcribe again}' : '{%Transcribe}';
@@ -273,31 +286,44 @@ if ( $_GET['api'] == 'status' ) {
 							}
 							tr.appendChild(td); T.appendChild(tr);
 						});
-						if ( by[g].length > limit[g] ) {
+						if ( sec.n > sec.items.length ) {
 							var p = document.createElement('p'), l = document.createElement('a');
-							l.href = '#'; l.textContent = '{%show more}';
-							l.onclick = function (e) { e.preventDefault(); limit[g] += 400; draw(); };
+							l.href = '#'; l.textContent = '{%show more}' + ' (' + (sec.n - sec.items.length) + ')';
+							l.onclick = function (e) { e.preventDefault(); more(g); };
 							p.appendChild(l); box.appendChild(p);
 						}
-						if ( !by[g].length ) { var e = document.createElement('p'); e.style.fontSize = 'smaller'; e.textContent = usage ? '-' : ''; box.appendChild(e); }
 					});
 				}
-				S.oninput = function () { limit = {todo: 200, running: 200, done: 200}; draw(); };
-				function json(u) { return fetch(u).then(function (r) { return r.json(); }); }
+				function url(g, offset) {
+					return '$audiourl&status=' + g + '&limit=' + PAGE + '&offset=' + offset + '&q=' + encodeURIComponent(S.value);
+				}
+				function load(g) {
+					return json(url(g, 0)).then(function (d) {
+						folder = d.folder; admin = d.admin; checking = d.checking;
+						SEC[g].items = d.items; SEC.todo.n = d.counts.todo; SEC.running.n = d.counts.running; SEC.done.n = d.counts.done;
+					});
+				}
+				function more(g) {
+					json(url(g, SEC[g].items.length)).then(function (d) { SEC[g].items = SEC[g].items.concat(d.items); draw(); });
+				}
+				function loadAll() {
+					var gs = checking ? ['todo'] : ['todo', 'running', 'done'];
+					Promise.all(gs.map(load)).then(function () {
+						SEC.running.items = checking ? [] : SEC.running.items; draw();
+					});
+				}
+				S.oninput = function () { clearTimeout(timer); timer = setTimeout(loadAll, 300); };
 				function scan() {
 					var out = document.getElementById('fa-scan');
 					json('$mediaurl&step=start').then(function loop(d) {
 						out.textContent = '{%checking TEITOK files}: ' + d.pos + ' / ' + d.total;
-						if ( d.done ) return json('$mediaurl&step=result').then(function (r) {
-							usage = r.usage; out.textContent = ''; draw();
-						});
+						if ( d.done ) { out.textContent = ''; checking = false; return loadAll(); }
 						return json('$mediaurl&step=next').then(loop);
 					}).catch(function () { out.textContent = '{%could not check the TEITOK files}'; });
 				}
-				json('$audiourl').then(function (d) { rows = d.audio; folder = d.folder; draw(); scan(); });
+				loadAll(); scan();
 			})();
 			</script>";
-		$maintext .= $audiohtml;
 	};
 	$maintext .= "<form action='index.php?action=upload&act=save' method='post' enctype='multipart/form-data'>
 		<input type='hidden' name='type' value='audio'><input type='hidden' name='submit' value='Save'>
@@ -316,7 +342,7 @@ if ( $_GET['api'] == 'status' ) {
 			$maintext .= "<tr><td><a href='index.php?action=$action&act=job&job=".urlencode($job['id'])."'>"
 				.fa_h(str_replace('T', ' ', substr($job['started'], 0, 16)))."</a></td>
 				<td>".fa_h(basename($job['audio']))."</td><td>".fa_h($job['lang'] ?: 'auto')."</td>
-				<td>".fa_h($job['mode'])."</td><td>".fa_h($job['user'])."</td>
+				<td>".fa_h($job['mode'])."</td><td>".fa_h(fa_who($job))."</td>
 				<td>".fa_h($job['status'])."</td><td>$res</td></tr>";
 		};
 		$maintext .= "</table>";

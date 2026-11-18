@@ -2,6 +2,11 @@
 // flexasr TEITOK module: helpers (settings, audio files, jobs, command line, results).
 // Used by flexasr.php; defines functions only.
 
+function fa_who($job) {
+	// The person who started a task, by name (older tasks only have the login).
+	return $job['name'] ?? ($job['user'] ?? '');
+}
+
 function fa_h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 // --- settings (settings.xml: <flexasr bin=".." home=".." models_dir=".." hf_home=".." admin="1" .../>) ---
@@ -106,10 +111,12 @@ function fa_media_scan($step, $budget = 1.5) {
 	};
 	if ( $dirty ) fa_json_write($cachefile, $cache);
 	fa_json_write($statefile, $state);
-	return array('done' => $state['pos'] >= $total, 'pos' => $state['pos'], 'total' => $total);
+	$done = $state['pos'] >= $total;
+	if ( $done ) fa_json_write(fa_jobdir().'/media-usage.json', fa_media_usage_build());     // what the pages read
+	return array('done' => $done, 'pos' => $state['pos'], 'total' => $total);
 }
 
-function fa_media_usage() {
+function fa_media_usage_build() {
 	// media key => ids of the xmlfiles that point at it (from the files of the last scan).
 	$state = fa_json_read(fa_jobdir().'/media-scan.json');
 	$cache = fa_json_read(fa_jobdir().'/media-index.json');
@@ -123,16 +130,52 @@ function fa_media_usage() {
 	return $usage;
 }
 
-function fa_audio_list() {
-	// Every audio file of the corpus with its media key and the status of its newest job.
+function fa_audio_files_cached() {
+	// The audio files of the corpus; the directory walk is remembered for a minute (a large folder is slow to walk).
+	$f = fa_jobdir().'/audio-list.json';
+	$c = fa_json_read($f);
+	if ( $c && time() - $c['time'] < 60 ) return $c['files'];
+	$files = fa_audio_files();
+	fa_json_write($f, array('time' => time(), 'files' => $files));
+	return $files;
+}
+
+function fa_audio_page($status, $q, $offset, $limit) {
+	// One page of the audio files with a given status (todo | running | done | all), optionally matching a search
+	// text, with the counts per status. Status: locked = running; found in the media of a TEITOK file = done; else
+	// todo. Before the first scan of xmlfiles/ has finished ("checking") nothing counts as done.
+	$usagefile = fa_jobdir().'/media-usage.json';
+	$checking = !file_exists($usagefile);
+	$usage = $checking ? array() : fa_json_read($usagefile);
+	$bybase = array();
+	foreach ( $usage as $key => $ids ) $bybase[basename($key)] = array_merge($bybase[basename($key)] ?? array(), $ids);
+	$locked = fa_locked_audio();
 	$jobs = array();
-	foreach ( array_reverse(fa_jobs(500)) as $job ) $jobs[fa_media_key($job['audio'])] = fa_job_state($job);
-	$out = array();
-	foreach ( fa_audio_files() as $f ) {
+	foreach ( array_reverse(fa_jobs(500)) as $job ) $jobs[fa_media_key($job['audio'])] = fa_job_state($job);   // newest wins
+	$q = mb_strtolower(trim((string)$q));
+	$counts = array('todo' => 0, 'running' => 0, 'done' => 0);
+	$items = array();
+	$skipped = 0;
+	$limit = max(1, min(500, (int)$limit));
+	$offset = max(0, (int)$offset);
+	$prefix = strlen(fa_audio_folder()) + 1;
+	foreach ( fa_audio_files_cached() as $f ) {
+		if ( $q !== '' && mb_strpos(mb_strtolower(substr($f, $prefix)), $q) === false ) continue;
 		$key = fa_media_key($f);
-		$out[] = array('p' => $f, 'k' => $key, 'j' => $jobs[$key] ?? '');
+		if ( isset($locked[$key]) ) { $st = 'running'; $j = $locked[$key]['status']; $x = array(); }
+		else {
+			$j = $jobs[$key] ?? '';
+			if ( $j == 'queued' || $j == 'running' ) $j = 'stalled';      // not locked any more
+			$x = $usage[$key] ?? ($bybase[basename($key)] ?? array());
+			$st = $x ? 'done' : 'todo';
+		};
+		$counts[$st]++;
+		if ( $status != 'all' && $st != $status ) continue;
+		if ( $skipped++ < $offset || count($items) >= $limit ) continue;
+		$items[] = array('p' => $f, 'j' => $j, 'x' => array_slice(array_values(array_unique($x)), 0, 5), 'xn' => count($x));
 	};
-	return $out;
+	return array('folder' => fa_audio_folder(), 'checking' => $checking, 'counts' => $counts,
+		'offset' => $offset, 'items' => $items);
 }
 
 function fa_audio_path($rel) {
@@ -161,6 +204,7 @@ function fa_models($lang, $mode, $allow) {
 	$args = array(fa_bin(), 'models', '--json', '--mode', $mode);
 	if ( $lang ) { $args[] = '-l'; $args[] = $lang; };
 	if ( $allow ) $args[] = '--allow-restricted';
+	@set_time_limit(180);            // loading the model libraries and fetching the registry can take a while the first time
 	$json = shell_exec(fa_cmd($args).' 2>/dev/null');
 	$data = json_decode((string)$json, true);
 	if ( $data ) file_put_contents($cache, $json);
@@ -198,21 +242,103 @@ function fa_jobs($limit = 30) {
 	return $out;
 }
 
+function fa_pid_alive($pid) {
+	if ( function_exists('posix_kill') ) return posix_kill($pid, 0);
+	return trim((string)shell_exec('kill -0 '.(int)$pid.' 2>/dev/null && echo y')) == 'y';
+}
+
+function fa_descendants($pid) {
+	$out = array();
+	foreach ( array_filter(explode("\n", trim((string)shell_exec('pgrep -P '.(int)$pid.' 2>/dev/null')))) as $kid )
+		$out = array_merge($out, fa_descendants((int)$kid), array((int)$kid));
+	return $out;
+}
+
+function fa_stop_job($job) {
+	// Stop a task: mark it cancelled and end the processes its runner started (the runner itself then sets the
+	// status and removes the lock). Returns the number of processes signalled; 0 when there was none to stop.
+	$dir = fa_jobdir();
+	touch("$dir/{$job['id']}.cancel");
+	$pid = (int)trim((string)@file_get_contents("$dir/{$job['id']}.pid"));
+	$n = 0;
+	if ( $pid > 0 && fa_pid_alive($pid) ) {
+		foreach ( fa_descendants($pid) as $kid ) {
+			if ( function_exists('posix_kill') ) posix_kill($kid, 15); else shell_exec('kill -TERM '.(int)$kid);
+			$n++;
+		};
+	};
+	return $n;
+}
+
 function fa_job_state($job) {
-	// The status of a job, except that a queued or running job that has not moved for stale_hours (default 12;
-	// settings.xml <flexasr stale_hours="..."/>) counts as "stalled": its server probably stopped.
+	// The status of a job, with two corrections for a runner that is gone: a queued or running job whose runner
+	// process no longer exists is "failed" (server restart, killed), and one that has not moved for stale_hours
+	// (default 12; settings.xml <flexasr stale_hours="..."/>) with no process to check is "stalled".
 	$st = $job['status'];
 	if ( $st != 'queued' && $st != 'running' ) return $st;
 	$dir = fa_jobdir();
+	$pidfile = "$dir/{$job['id']}.pid";
+	if ( file_exists($pidfile) ) {
+		$pid = (int)trim((string)@file_get_contents($pidfile));
+		if ( $pid > 0 ) return fa_pid_alive($pid) ? $st : 'failed';
+	};
 	$last = max((int)@filemtime("$dir/{$job['id']}.status"), (int)@filemtime("$dir/{$job['id']}.log"));
 	return time() - $last > (float)getset('flexasr/stale_hours', 12) * 3600 ? 'stalled' : $st;
 }
 
-function fa_active_job($audio, $output = '') {
-	// A queued or running job on this audio file (or writing this output file), or null.
+// --- locks: one file per audio that is being processed, tmp/flexasr-jobs/locks/<hash>.lock (JSON: key, job, user,
+// since). Created (atomically) when a task is started, removed by the runner when it ends; it can also be removed
+// by hand (rm), or with "release" on the page. A lock whose job is no longer queued or running is dropped.
+
+function fa_lockdir() {
+	$d = fa_jobdir().'/locks';
+	if ( !is_dir($d) ) mkdir($d, 0777, true);
+	return $d;
+}
+
+function fa_lockfile($audio) { return fa_lockdir().'/'.md5(fa_media_key($audio)).'.lock'; }
+
+function fa_lock_info($audio) {
+	// The job holding the lock on this audio file (with its state), or null; a dead lock is removed.
+	$f = fa_lockfile($audio);
+	if ( !file_exists($f) ) return null;
+	$info = json_decode((string)@file_get_contents($f), true);
+	$job = $info ? fa_job($info['job']) : null;
+	if ( !$job || !in_array(fa_job_state($job), array('queued', 'running')) ) {
+		@unlink($f);
+		return null;
+	};
+	return $job;
+}
+
+function fa_lock_acquire($audio, $job) {
+	// True when the lock is ours (created now); false when someone else holds it.
+	if ( fa_lock_info($audio) ) return false;
+	$fh = @fopen(fa_lockfile($audio), 'x');          // 'x': fails if the file exists, so two clicks cannot both win
+	if ( !$fh ) return false;
+	fwrite($fh, json_encode(array('key' => fa_media_key($audio), 'job' => $job['id'], 'user' => $job['user'], 'since' => date('c'))));
+	fclose($fh);
+	return true;
+}
+
+function fa_lock_release($audio) { @unlink(fa_lockfile($audio)); }
+
+function fa_locked_audio() {
+	// media key => job of the audio files that are locked now.
+	$out = array();
+	foreach ( glob(fa_lockdir().'/*.lock') ?: array() as $f ) {
+		$info = json_decode((string)@file_get_contents($f), true);
+		$job = $info ? fa_job($info['job']) : null;
+		if ( $job && in_array(fa_job_state($job), array('queued', 'running')) ) $out[$info['key']] = $job;
+		else @unlink($f);
+	};
+	return $out;
+}
+
+function fa_output_job($output) {
+	// A queued or running job that writes this output file, or null.
 	foreach ( fa_jobs(500) as $job ) {
-		if ( fa_job_state($job) != $job['status'] || ($job['status'] != 'queued' && $job['status'] != 'running') ) continue;
-		if ( fa_media_key($job['audio']) == fa_media_key($audio) || ($output && $job['output'] == $output) ) return $job;
+		if ( $job['output'] == $output && in_array(fa_job_state($job), array('queued', 'running')) ) return $job;
 	};
 	return null;
 }
@@ -250,17 +376,23 @@ function fa_start($job) {
 	$q = function ($s) { return escapeshellarg($s); };
 	file_put_contents("$dir/$id.json", json_encode($job, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 	file_put_contents("$dir/$id.status", "queued\n");
+	if ( !fa_lock_acquire($job['audio'], $job) ) {      // after the spec exists, so that nobody takes the lock for a dead one
+		@unlink("$dir/$id.json"); @unlink("$dir/$id.status");
+		return false;
+	};
 	$tmpout = "$dir/$id.xml";
 	$work = 'echo running > '.$q("$dir/$id.status").'; '
 		.fa_cmd(fa_run_args($job, $tmpout)).' >> '.$q("$dir/$id.log").' 2>&1'
 		.' && mkdir -p '.$q(dirname($job['output'])).' && mv -f '.$q($tmpout).' '.$q($job['output']);
 	$inner = 'sh -c '.$q($work);
 	$serial = 'if command -v flock >/dev/null 2>&1; then flock '.$q("$dir/run.lock").' '.$inner.'; else '.$inner.'; fi';
-	$runner = '(cd '.$q(getcwd()).' && { '.$serial.'; }; rc=$?; '
-		.'if [ $rc -eq 0 ]; then echo done > '.$q("$dir/$id.status").'; else echo failed > '.$q("$dir/$id.status").'; fi)'
-		.' > /dev/null 2>&1 &';
+	$script = 'echo $$ > '.$q("$dir/$id.pid").'; cd '.$q(getcwd()).' && { '.$serial.'; }; rc=$?; '
+		.'if [ $rc -eq 0 ]; then echo done > '.$q("$dir/$id.status").'; elif [ -e '.$q("$dir/$id.cancel").' ]; then echo cancelled > '.$q("$dir/$id.status").'; else echo failed > '.$q("$dir/$id.status").'; fi; '
+		.'rm -f '.$q(fa_lockfile($job['audio'])).' '.$q("$dir/$id.pid").' '.$q("$dir/$id.cancel");
+	$runner = 'sh -c '.$q($script).' > /dev/null 2>&1 &';
 	file_put_contents("$dir/$id.log", '$ '.fa_cmd(fa_run_args($job, $tmpout))."\n");
 	shell_exec($runner);
+	return true;
 }
 
 // --- results ---
