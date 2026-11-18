@@ -9,7 +9,7 @@ SE.palette = (function () {
 		["Word", ["edit", "insertBefore", "insertAfter", "delete", "join", "extract"]],
 		["Speaker", "speakers"],
 		["Audio", ["play", "playUtt", "stop", "adjust"], "audio"],
-		["Uncertain words", ["nextLow", "prevLow", "accept"], "conf"],
+		["Uncertain words", ["toggleConf", "nextLow", "prevLow", "accept"], "conf"],
 		["File", ["undo", "redo", "save"]]
 	];
 	var SHORT = {
@@ -19,7 +19,7 @@ SE.palette = (function () {
 		detok: "detokenize", tokenize: "tokenize", detokAll: "detokenize speaker", tokAll: "tokenize speaker",
 		edit: "edit", insertBefore: "insert before", insertAfter: "insert after", delete: "delete", join: "join with next",
 		play: "play / pause", playUtt: "play utterance", stop: "stop", adjust: "adjust times",
-		nextLow: "next uncertain", prevLow: "previous uncertain", accept: "accept",
+		toggleConf: "show / hide marking", nextLow: "next uncertain", prevLow: "previous uncertain", accept: "accept",
 		undo: "undo", redo: "redo", save: "save"
 	};
 	var KEY = "spoken-edit-palette", opts, win, body, toggleB, buttons = {}, speakerBox, pos = { x: null, y: null, open: false };
@@ -104,9 +104,11 @@ SE.palette = (function () {
 			if ( on ) place();
 			pos.open = on; store();
 		},
-		// the state of the buttons that depend on it: { undo, redo, save } true when the action is possible
+		// the state of the buttons that depend on it: { undo, redo, save } true when the action is possible, { conf } whether the
+		// marking of uncertain words is shown (the buttons not named keep their state)
 		sync: function ( st ) {
-			["undo", "redo", "save"].forEach(function ( a ) { if ( buttons[a] ) buttons[a].disabled = !st[a]; });
+			["undo", "redo", "save"].forEach(function ( a ) { if ( st[a] !== undefined && buttons[a] ) buttons[a].disabled = !st[a]; });
+			if ( st.conf !== undefined && buttons.toggleConf ) buttons.toggleConf.classList.toggle("se-on", !!st.conf);
 			drawSpeakers();
 		}
 	};

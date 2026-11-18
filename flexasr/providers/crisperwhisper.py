@@ -76,10 +76,12 @@ class CrisperWhisper(Transcriber):
                         "differ slightly from CPU/CUDA (set FLEXASR_DEVICE=cpu to compare)")
         model = CrisperWhisperModel(self._local_dir(), **self._settings())
         opts = dict(self.ctx.options.get("transcribe", {}))
+        opts.setdefault("word_confidence", True)          # the probability of each word (kept as @conf, for the editor's "uncertain words")
         mode = "verbatim" if self.ctx.mode == "verbatim" else "intended"
         res = model.transcribe(audio, sr=sr, language=langs.iso1(self.ctx.language) or "en", mode=mode,
                                word_timestamps=True, **opts)
-        words = [Word(text=w.word.strip(), start=round(w.start, 3), end=round(w.end, 3))
+        words = [Word(text=w.word.strip(), start=round(w.start, 3), end=round(w.end, 3),
+                      conf=round(w.probability, 3) if getattr(w, "probability", None) is not None else None)
                  for w in (res.words or []) if w.word.strip() and w.start is not None]
         return utterances_from_words(words, float(self.ctx.options.get("utterance_gap", 1.0)))
 

@@ -38,6 +38,8 @@
 .se-pause, .se-vocal, .se-other { color: #888; font-size: 82%; }
 .se-del { color: #999; text-decoration: line-through; }
 .se-low { background: rgba(198, 40, 40, calc(.08 + var(--se-conf, 0) * .3)); border-bottom: 2px solid var(--se-low); }
+.se-noconf .se-low { background: none; border-bottom-color: transparent; }
+.se-bar button.se-pressed, .se-pal-row button.se-on { background: #e3edff; border-color: var(--se-sel); }
 .se-rv { border-bottom: 2px solid #2e7d32; }
 .se-cur { outline: 2px solid var(--se-sel); background: #dbe8ff; }
 .se-now { background: #ffe8a3; }

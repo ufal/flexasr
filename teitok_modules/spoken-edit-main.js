@@ -1,10 +1,16 @@
 // spoken-edit: the page: toolbar, speakers, and what each key does (the actions and keys window: spoken-edit-palette.js)
 var SE = window.SE = window.SE || {};
 SE.main = (function () {
-	var busy = false, cfg, app, bar, msg, list, ask, speakersBox, counter, lowIdx = -1, undoB, redoB, saveB;
+	var busy = false, cfg, app, bar, msg, list, ask, speakersBox, counter, lowIdx = -1, undoB, redoB, saveB, confB, confOn = true;
 
 	function el ( tag, cls, text ) { var e = document.createElement(tag); if ( cls ) e.className = cls; if ( text !== undefined ) e.textContent = text; return e; }
 	function button ( label, title, fn ) { var b = el("button", "", label); b.type = "button"; b.title = title || ""; b.addEventListener("click", function () { fn(); app.focus(); }); return b; }
+	// the marking of uncertain words can be hidden (to read the text as it is) and shown again; remembered in the browser
+	function applyConf () {
+		list.classList.toggle("se-noconf", !confOn);
+		if ( confB ) { confB.classList.toggle("se-pressed", confOn); confB.setAttribute("aria-pressed", confOn ? "true" : "false"); }
+		if ( SE.palette ) SE.palette.sync({ conf: confOn });
+	}
 	function say ( text, kind ) { msg.textContent = text || ""; msg.className = "se-msg" + (kind ? " se-" + kind : ""); }
 	function data () { return SE.model.data(); }
 	function curU () { var c = SE.view.cursor(); return data().us[c.u]; }
@@ -23,7 +29,7 @@ SE.main = (function () {
 		var d = data(), n = SE.model.dirty();
 		undoB.disabled = !SE.model.canUndo(); redoB.disabled = !SE.model.canRedo();
 		saveB.textContent = n ? "Save (" + n + ")" : "Save"; saveB.classList.toggle("se-dirty", n > 0); saveB.disabled = !n || !cfg.canwrite;
-		if ( SE.palette ) SE.palette.sync({ undo: SE.model.canUndo(), redo: SE.model.canRedo(), save: n > 0 && !!cfg.canwrite });
+		if ( SE.palette ) SE.palette.sync({ undo: SE.model.canUndo(), redo: SE.model.canRedo(), save: n > 0 && !!cfg.canwrite, conf: confOn });
 		var low = SE.view.uncertainList(); counter.textContent = d.hasconf ? low.length + " uncertain" : "";
 		drawSpeakers();
 	}
@@ -149,6 +155,12 @@ SE.main = (function () {
 		detokAll: function () { allOf("detok_who", "Detokenize"); }, tokAll: function () { allOf("tok_who", "Tokenize"); },
 		accept: function () { exec({ op: "accept", u: uid(), i: ci() }).then(function () { lowIdx = Math.max(-1, lowIdx - 1); jumpLow(1); }); },
 		nextLow: function () { jumpLow(1); }, prevLow: function () { jumpLow(-1); },
+		toggleConf: function () {
+			if ( !data().hasconf ) return say("This file has no word confidences.", "info");
+			confOn = !confOn; applyConf();
+			try { localStorage.setItem("spoken-edit-conf", confOn ? "1" : "0"); } catch ( e ) {}
+			say(confOn ? "Marking of uncertain words on." : "Marking of uncertain words off (v shows it again).", "info");
+		},
 		play: function () {
 			if ( !SE.audio.available() ) return say("The recording is not available.", "error");
 			if ( SE.audio.playing() ) SE.audio.stop(); else { var c = SE.view.cursor(); SE.audio.playFrom(SE.view.timeOf(c.u, c.i) || 0); }
@@ -222,6 +234,9 @@ SE.main = (function () {
 			}
 			if ( d.hasconf ) {
 				bar.appendChild(el("span", "se-sep"));
+				try { confOn = localStorage.getItem("spoken-edit-conf") !== "0"; } catch ( e ) {}
+				confB = button("◐ confidence", "show or hide the marking of uncertain words (v)", actions.toggleConf);
+				bar.appendChild(confB);
 				var lab = el("label", "", "uncertain below "), th = el("input"); th.type = "number"; th.min = 0; th.max = 1; th.step = 0.05; th.value = c.lowconf; th.style.width = "4.5em";
 				th.addEventListener("change", function () { SE.view.lowconf(parseFloat(th.value) || 0); lowIdx = -1; SE.view.render(); refresh(); });
 				lab.appendChild(th); bar.appendChild(lab); counter = el("span", "se-count"); bar.appendChild(counter);
@@ -258,6 +273,7 @@ SE.main = (function () {
 			Object.keys(actions).forEach(function ( k ) { guarded[k] = function ( ev ) { if ( !busy ) actions[k](ev); }; });
 			SE.keys.bind(guarded);
 			setInterval(function () { fetch(cfg.base + "&act=ping", { credentials: "same-origin" }).catch(function () {}); }, 600000);
+			applyConf();
 			SE.view.render(); SE.view.setCursor(0, 0, true); refresh(); app.focus();
 			if ( c.tid ) openAt(c.tid);
 			var low = SE.view.uncertainList(); if ( low.length ) say(low.length + " uncertain words: press c to go through them, least certain first.", "info");

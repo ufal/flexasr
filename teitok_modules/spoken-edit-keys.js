@@ -21,6 +21,7 @@ SE.keys = (function () {
 		["-", "join", "join this word with the next"],
 		[" ", "play", "play / pause from this word"], ["p", "playUtt", "play this utterance"], ["Escape", "stop", "stop"],
 		["w", "adjust", "adjust the times in the waveform editor, at this word (save first)"],
+		["v", "toggleConf", "show or hide the marking of uncertain words"],
 		["c", "nextLow", "next uncertain word (least certain first)"], ["C", "prevLow", "previous uncertain word"],
 		["a", "accept", "accept this word as correct and go to the next uncertain one"],
 		["mod+z", "undo", "undo"], ["mod+shift+z", "redo", "redo"], ["mod+y", "redo", ""], ["mod+s", "save", "save"],
