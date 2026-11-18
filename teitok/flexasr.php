@@ -8,11 +8,12 @@
 //   index.php?action=flexasr&api=audio&status=todo|running|done|all&q=TEXT&offset=N&limit=N   one page of audio files
 //   index.php?action=flexasr&api=media&step=start|next   the scan of xmlfiles/ for the media they use (steps)
 // Settings (settings.xml): <flexasr bin="/path/to/venv/bin/flexasr" home="/path/to/flexasr-home"
-//   models_dir="/big/disk/models" hf_home="..." admin="1" language="fra" restricted="1"/>
-//   (admin="1": only admins may run jobs; language: default language; restricted="1": offer restricted-licence
+//   models_dir="/big/disk/models" hf_home="..." users="1" language="fra" restricted="1"/>
+//   (the module is for administrators; users="1": every logged-in user may use it, and stop their own tasks;
+//   language: default language; restricted="1": offer restricted-licence
 //   models by default, e.g. for an academic corpus, with the licence conditions shown before a job starts)
 
-check_login(getset('flexasr/admin') ? 'admin' : 'user');
+check_login(getset('flexasr/users') ? 'user' : 'admin');       // administrators only, unless <flexasr users="1"/>
 require_once(__DIR__.'/flexasr_lib.php');
 
 $fa_modes = array('verbatim' => '{%verbatim} ({%keeps fillers, repetitions, false starts})',
@@ -29,7 +30,6 @@ if ( $_GET['api'] == 'status' ) {
 	header('Content-Type: application/json');
 	$status = in_array($_GET['status'], array('todo', 'running', 'done', 'all')) ? $_GET['status'] : 'todo';
 	$page = fa_audio_page($status, $_GET['q'], $_GET['offset'], $_GET['limit'] ?: 100);
-	$page['admin'] = $user['permissions'] == 'admin';
 	print json_encode($page, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 	exit;
 
@@ -39,10 +39,10 @@ if ( $_GET['api'] == 'status' ) {
 	exit;
 
 } else if ( $act == 'stop' ) {
-	if ( $user['permissions'] != 'admin' ) fatal('Only an administrator can stop a task');
 	$audio = fa_audio_path($_POST['audio'] ?? '');
 	if ( !$audio || $_SERVER['REQUEST_METHOD'] != 'POST' ) fatal('No such audio file');
 	$job = fa_lock_info($audio);
+	if ( $job && $user['permissions'] != 'admin' && $job['user'] != $username ) fatal('Only the person who started a task, or an administrator, can stop it');
 	if ( $job ) fa_stop_job($job);
 	fa_lock_release($audio);              // also when there was no process left: a dead task must not keep the file
 	header("Location: index.php?action=$action");
@@ -236,7 +236,7 @@ if ( $_GET['api'] == 'status' ) {
 			<div id='fa-audio-sections'></div>
 			<script>
 			(function () {
-				var PAGE = 100, checking = true, admin = false, folder = '', timer = null;
+				var PAGE = 100, checking = true, folder = '', timer = null;
 				var SEC = {todo: {items: [], n: 0}, running: {items: [], n: 0}, done: {items: [], n: 0}};
 				var box = document.getElementById('fa-audio-sections'), S = document.getElementById('fa-search');
 				var TITLES = {todo: '{%No TEITOK file yet}', running: '{%In progress}', done: '{%Already in a TEITOK file}'};
@@ -252,7 +252,7 @@ if ( $_GET['api'] == 'status' ) {
 				}
 				function note(g, a) {
 					var td = document.createElement('td'); td.style.fontSize = 'smaller';
-					if ( g == 'running' ) { td.textContent = a.j + ' '; if ( admin ) td.appendChild(stopform(a)); }
+					if ( g == 'running' ) { td.textContent = a.j + ' '; td.appendChild(stopform(a)); }
 					else if ( g == 'done' ) {
 						a.x.forEach(function (id, i) {
 							if ( i ) td.appendChild(document.createTextNode(', '));
@@ -299,7 +299,7 @@ if ( $_GET['api'] == 'status' ) {
 				}
 				function load(g) {
 					return json(url(g, 0)).then(function (d) {
-						folder = d.folder; admin = d.admin; checking = d.checking;
+						folder = d.folder; checking = d.checking;
 						SEC[g].items = d.items; SEC.todo.n = d.counts.todo; SEC.running.n = d.counts.running; SEC.done.n = d.counts.done;
 					});
 				}

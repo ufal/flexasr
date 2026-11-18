@@ -96,7 +96,7 @@ sudo python3 teitok/install.py --shared /var/www/html/teitok/shared --user www-d
 ```
 
 `home` is a flexasr home (config, gated-model access) for the web server user; run `flexasr setup`
-for gated models with `FLEXASR_HOME` set to it. `admin="1"` limits starting tasks to admins; `language` is the default language and `restricted="1"` offers
+for gated models with `FLEXASR_HOME` set to it. the module is for administrators, and `users="1"` opens it to every logged-in user, who can then only stop their own tasks; `language` is the default language and `restricted="1"` offers
 restricted-licence models by default (for an academic corpus; the licence conditions are shown before a job starts).
 
 ## Adding a model or provider
