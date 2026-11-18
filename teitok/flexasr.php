@@ -24,7 +24,7 @@ if ( $_GET['api'] == 'status' ) {
 	header('Content-Type: application/json');
 	$job = fa_job($_GET['job']);
 	if ( !$job ) { http_response_code(404); print json_encode(array('error' => 'no such job')); exit; };
-	print json_encode(array('status' => $job['status'], 'log' => fa_log_tail($job['id'])));
+	print json_encode(array('status' => $job['status'], 'log' => fa_log_tail($job['id'], 20000, !empty($_GET['full']))));
 	exit;
 
 } else if ( $_GET['api'] == 'audio' ) {
@@ -205,12 +205,13 @@ if ( $_GET['api'] == 'status' ) {
 		$maintext .= "<p class='wrong'>{%The output file is missing}: ".fa_h($job['output'])."</p>";
 	};
 	$maintext .= "<h2>{%Log}</h2><pre id='fa-log' style='max-height: 400px; overflow: auto; font-size: smaller; white-space: pre-wrap;'>"
-		.fa_h(fa_log_tail($id))."</pre>
-		<p><a href='index.php?action=$action'>{%All tasks}</a></p>";
+		.fa_h(fa_log_tail($id, 20000, !empty($_GET['full'])))."</pre>
+		<p><a href='index.php?action=$action'>{%All tasks}</a>
+		&middot; <a href='index.php?action=$action&act=job&job=".urlencode($id).(empty($_GET['full']) ? "&full=1'>{%Full log}" : "'>{%Short log}")."</a></p>";
 	if ( $job['status'] == 'queued' || $job['status'] == 'running' ) {
 		$maintext .= "<script>
 		(function () {
-			var url = 'index.php?action=$action&api=status&job=".urlencode($id)."';
+			var url = 'index.php?action=$action&api=status&job=".urlencode($id).(empty($_GET['full']) ? '' : '&full=1')."';
 			var timer = setInterval(function () {
 				fetch(url).then(function (r) { return r.json(); }).then(function (d) {
 					document.getElementById('fa-status').textContent = d.status;

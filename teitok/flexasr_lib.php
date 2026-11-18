@@ -348,14 +348,27 @@ function fa_output_job($output) {
 	return null;
 }
 
-function fa_log_clean($text) {
+function fa_log_clean($text, $full = false) {
+	// The log is shown to every user of the module: keep the progress, drop the server's directory structure
+	// (an absolute path becomes "…/last-part"; web addresses are left alone) and, unless $full, the model libraries'
+	// own chatter: progress bars, the weight-loading report, repeated generation warnings.
 	$text = preg_replace('/^\$ .*\R?/m', '', (string)$text);          // the command line that older tasks wrote as the first line
-	// The log is shown to every user of the module: keep the progress, drop the server's directory structure.
-	// An absolute path becomes ".../last-part"; web addresses (https://...) are left alone.
+	if ( !$full ) {
+		$noise = array('/^\[transformers\].*$/', '/(Fetching \d+ files|Loading weights:)/', '/LOAD REPORT/', '/^Key\s+\|/',
+			'/^[-+]{3,}$/', '/^encoder_blank_head/', '/^Notes:/', '/^- UNEXPECTED/', '/^Detected CrisperWhisper/',
+			'/torchcodec|libtorchcodec|warnings\.warn|\[end of libtorchcodec/');
+		$keep = array();
+		foreach ( preg_split('/\R/', $text) as $line ) {
+			$skip = false;
+			foreach ( $noise as $re ) if ( preg_match($re, $line) ) { $skip = true; break; }
+			if ( !$skip && !($line === '' && end($keep) === '') ) $keep[] = $line;
+		};
+		$text = implode("\n", $keep);
+	};
 	return preg_replace('~(?<![:\w/.@+-])/(?:[\w.@+=,-]+/)+([\w.@+=,-]*)~u', '…/$1', $text);
 }
 
-function fa_log_tail($id, $bytes = 20000) {
+function fa_log_tail($id, $bytes = 20000, $full = false) {
 	$f = fa_jobdir()."/$id.log";
 	if ( !file_exists($f) ) return '';
 	$size = filesize($f);
@@ -363,7 +376,7 @@ function fa_log_tail($id, $bytes = 20000) {
 	if ( $size > $bytes ) fseek($fh, -$bytes, SEEK_END);
 	$txt = stream_get_contents($fh);
 	fclose($fh);
-	return fa_log_clean($txt);
+	return fa_log_clean($txt, $full);
 }
 
 function fa_run_args($job, $out) {

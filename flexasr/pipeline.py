@@ -107,6 +107,9 @@ def run(path: str | Path, s: Settings, stages: tuple[str, ...] = ALL_STAGES, doc
     from .cache import setup as setup_cache
 
     mdir = setup_cache(load_config())        # before any model library is imported
+    from .quiet import quiet
+
+    quiet()                                  # the libraries' progress bars and repeated warnings stay out of the log
     unknown = [st for st in stages if st not in STAGES]
     if unknown:
         raise ValueError(f"unknown stage(s) {', '.join(unknown)} (stages: {', '.join(ALL_STAGES)})")
