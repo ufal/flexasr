@@ -188,16 +188,14 @@ if ( $_GET['api'] == 'status' ) {
 	} else {
 		$audiourl = "index.php?action=$action&api=audio";
 		$mediaurl = "index.php?action=$action&api=media";
-		$audiohtml = "<div id='fa-audio-bar'>
-			<select id='fa-filter'><option value='todo'>{%No TEITOK file yet}</option><option value='running'>{%In progress}</option>
-				<option value='done'>{%Already in a TEITOK file}</option><option value='all'>{%All audio files}</option></select>
-			<input id='fa-search' placeholder='{%search}' size='20'> <span id='fa-count'></span>
+		$audiohtml = "<div id='fa-audio-bar'><input id='fa-search' placeholder='{%search}' size='20'>
 			<span id='fa-scan' style='font-size: smaller; color: #777;'></span></div>
-			<table id='fa-audio-table'></table><p id='fa-more' style='display: none;'><a href='#' id='fa-more-link'>{%show more}</a></p>
+			<div id='fa-audio-sections'></div>
 			<script>
 			(function () {
-				var rows = [], usage = null, shown = 200, folder = '';
-				var T = document.getElementById('fa-audio-table'), F = document.getElementById('fa-filter'), S = document.getElementById('fa-search');
+				var rows = [], usage = null, folder = '', limit = {todo: 200, running: 200, done: 200};
+				var box = document.getElementById('fa-audio-sections'), S = document.getElementById('fa-search');
+				var TITLES = {todo: '{%No TEITOK file yet}', running: '{%In progress}', done: '{%Already in a TEITOK file}'};
 				function ids(a) { var u = usage && usage[a.k]; return u ? u : []; }
 				function status(a) {
 					if ( a.j == 'queued' || a.j == 'running' ) return 'running';
@@ -205,29 +203,45 @@ if ( $_GET['api'] == 'status' ) {
 					return ids(a).length ? 'done' : 'todo';
 				}
 				function name(a) { return a.p.substring(folder.length + 1); }
+				function cell(tr, text) { var td = document.createElement('td'); td.textContent = text; tr.appendChild(td); return td; }
 				function draw() {
-					var f = F.value, q = S.value.toLowerCase(), n = 0, html = [];
-					T.innerHTML = '';
+					var q = S.value.toLowerCase(), by = {todo: [], running: [], done: []};
 					rows.forEach(function (a) {
-						var st = status(a);
-						if ( f != 'all' && st != f ) return;
 						if ( q && name(a).toLowerCase().indexOf(q) < 0 ) return;
-						n++;
-						if ( n > shown ) return;
-						var tr = document.createElement('tr'), td = document.createElement('td'), r = document.createElement('input');
-						r.type = 'radio'; r.name = 'audio'; r.value = a.p; r.required = true;
-						td.appendChild(r); tr.appendChild(td);
-						td = document.createElement('td'); td.textContent = name(a); tr.appendChild(td);
-						td = document.createElement('td'); td.style.fontSize = 'smaller';
-						var u = ids(a);
-						td.textContent = a.j == 'queued' || a.j == 'running' ? a.j : (u.length ? '→ ' + u.slice(0, 3).join(', ') + (u.length > 3 ? ', …' : '') : (a.j == 'failed' ? '{%last run failed}' : ''));
-						tr.appendChild(td); T.appendChild(tr);
+						by[status(a)].push(a);
 					});
-					document.getElementById('fa-count').textContent = n + ' / ' + rows.length;
-					document.getElementById('fa-more').style.display = n > shown ? '' : 'none';
+					box.innerHTML = '';
+					['todo', 'running', 'done'].forEach(function (g) {
+						if ( !by[g].length && g != 'todo' ) return;
+						var h = document.createElement('h3'); h.textContent = (g == 'todo' && !usage ? '{%Audio files}' : TITLES[g]) + ' (' + by[g].length + ')'; box.appendChild(h);
+						var T = document.createElement('table'); box.appendChild(T);
+						by[g].slice(0, limit[g]).forEach(function (a) {
+							var tr = document.createElement('tr'), td = document.createElement('td'), r = document.createElement('input');
+							r.type = 'radio'; r.name = 'audio'; r.value = a.p; r.required = true;
+							td.appendChild(r); tr.appendChild(td);
+							cell(tr, name(a));
+							td = document.createElement('td'); td.style.fontSize = 'smaller';
+							if ( g == 'running' ) td.textContent = a.j;
+							else if ( g == 'done' ) {
+								ids(a).slice(0, 5).forEach(function (id, i) {
+									if ( i ) td.appendChild(document.createTextNode(', '));
+									var l = document.createElement('a'); l.textContent = id;
+									l.href = 'index.php?action=wavesurfer&cid=' + encodeURIComponent(id); td.appendChild(l);
+								});
+								if ( ids(a).length > 5 ) td.appendChild(document.createTextNode(', …'));
+							} else if ( a.j == 'failed' ) td.textContent = '{%last run failed}';
+							tr.appendChild(td); T.appendChild(tr);
+						});
+						if ( by[g].length > limit[g] ) {
+							var p = document.createElement('p'), l = document.createElement('a');
+							l.href = '#'; l.textContent = '{%show more}';
+							l.onclick = function (e) { e.preventDefault(); limit[g] += 400; draw(); };
+							p.appendChild(l); box.appendChild(p);
+						}
+						if ( !by[g].length ) { var e = document.createElement('p'); e.style.fontSize = 'smaller'; e.textContent = usage ? '-' : ''; box.appendChild(e); }
+					});
 				}
-				F.onchange = S.oninput = function () { shown = 200; draw(); };
-				document.getElementById('fa-more-link').onclick = function (e) { e.preventDefault(); shown += 400; draw(); };
+				S.oninput = function () { limit = {todo: 200, running: 200, done: 200}; draw(); };
 				function json(u) { return fetch(u).then(function (r) { return r.json(); }); }
 				function scan() {
 					var out = document.getElementById('fa-scan');
