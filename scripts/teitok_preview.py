@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
+import zlib
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -50,6 +51,36 @@ def sample_project(proj: Path) -> None:
     (jobs / "locks" / (hashlib.md5(b"I3_corto.m4a").hexdigest() + ".lock")).write_text(json.dumps(lock), encoding="utf-8")
 
 
+def with_conf(xml: str) -> str:
+    """Give every timed word a made-up confidence (stable per word) so the editor's uncertain-word tools have something to show."""
+    out, pos = [], 0
+    while (i := xml.find('<tok id="', pos)) >= 0:
+        j = xml.find(">", i)
+        tag = xml[i:j]
+        if ' start="' in tag and " conf=" not in tag:
+            tag += f' conf="{0.35 + (zlib.crc32(tag.encode()) % 650) / 1000:.2f}"'
+        out.append(xml[pos:i] + tag + ">")
+        pos = j + 1
+    return "".join(out) + xml[pos:]
+
+
+def editor_sample(proj: Path) -> None:
+    """Files for the spoken-transcript editor (action=spoken-edit): flexasr output of the fixture, with and without word
+    confidences, one with a plain-text interviewer; scripts linked into Scripts/ as the installer would copy them."""
+    fx = HERE.parent / "data" / "fixtures"
+    for name, src in (("editor-demo", "interview-fr-tts.flexasr.xml"), ("editor-demo-untokenized", "interview-fr-tts.flexasr-untokenized.xml")):
+        if (fx / src).exists() and not (proj / "xmlfiles" / f"{name}.xml").exists():
+            shutil.copy(fx / src, proj / "xmlfiles" / f"{name}.xml")
+    if (fx / "interview-fr-tts.flexasr.xml").exists() and not (proj / "xmlfiles" / "editor-demo-conf.xml").exists():
+        text = (fx / "interview-fr-tts.flexasr.xml").read_text(encoding="utf-8")
+        (proj / "xmlfiles" / "editor-demo-conf.xml").write_text(with_conf(text), encoding="utf-8")
+    (proj / "Scripts").mkdir(exist_ok=True)
+    for f in [*HERE.parent.glob("teitok_modules/*.js"), *HERE.parent.glob("teitok_modules/*.css")]:
+        link = proj / "Scripts" / f.name
+        if not (link.is_symlink() or link.exists()):
+            link.symlink_to(f)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--port", type=int, default=8099)
@@ -62,9 +93,11 @@ def main() -> int:
     proj = Path(a.dir)
     if not (proj / "xmlfiles").exists():
         sample_project(proj)
+    editor_sample(proj)
     env = {**os.environ, "FA_PREVIEW_PROJ": str(proj), "FA_BIN": a.bin, "FA_RESTRICTED": "1", "FA_LANGUAGE": "fra"}
     print(f"flexasr TEITOK module preview: http://127.0.0.1:{a.port}/index.php?action=flexasr   (project: {proj})", flush=True)
-    return subprocess.call(["php", "-S", f"127.0.0.1:{a.port}", str(HERE / "teitok_preview" / "router.php")], env=env)
+    print(f"transcript editor: http://127.0.0.1:{a.port}/index.php?action=spoken-edit&cid=editor-demo-conf", flush=True)
+    return subprocess.call(["php", "-S", f"127.0.0.1:{a.port}", "-t", str(proj), str(HERE / "teitok_preview" / "router.php")], env=env)
 
 
 if __name__ == "__main__":

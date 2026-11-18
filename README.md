@@ -91,7 +91,7 @@ disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 Install it into the TEITOK shared project and tell it where flexasr is:
 
 ```bash
-sudo python3 teitok_modules/install.py --shared /var/www/html/teitok/shared --user www-data
+sudo perl teitok_modules/install-flexasr.pl --shared /var/www/html/teitok/shared --user www-data
 ```
 
 ```xml
