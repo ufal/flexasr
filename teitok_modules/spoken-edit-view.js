@@ -1,7 +1,7 @@
 // spoken-edit: drawing the utterances, the cursor, the uncertain words, and editing a word in place
 var SE = window.SE = window.SE || {};
 SE.view = (function () {
-	var root, list, cfg, cur = { u: 0, i: 0 }, hl = null, lowconf = 0.7, nowEl = null;
+	var root, list, cfg, cur = { u: 0, i: 0 }, hl = null, lowconf = 0.7, nowEl = null, sel = null;
 	var PALETTE = ["#1f6feb", "#b8860b", "#2e7d32", "#8e24aa", "#c62828", "#00838f", "#6d4c41", "#455a64"];
 
 	function el ( tag, cls, text ) { var e = document.createElement(tag); if ( cls ) e.className = cls; if ( text !== undefined ) e.textContent = text; return e; }
@@ -46,10 +46,25 @@ SE.view = (function () {
 		setList: function ( l ) { list = l; },
 		lowconf: function ( v ) { if ( v !== undefined ) lowconf = v; return lowconf; },
 		cursor: function () { return cur; },
-		setCursor: function ( u, i, noscroll ) {
+		// some items of one utterance, in any combination (a run, or single ones added with ⌘/Ctrl-click): { u, set (sorted
+		// item numbers), anchor (where a shift-click or shift-arrow range starts) }
+		selection: function () { return sel; },
+		select: function ( u, indices, anchor ) {
+			SE.view.clearSelection();
+			var set = indices.slice().sort(function ( x, y ) { return x - y; }).filter(function ( v, k, all ) { return k === 0 || v !== all[k - 1]; });
+			sel = { u: u, set: set, anchor: anchor };
+			set.forEach(function ( k ) { var e = itemEl(u, k); if ( e ) e.classList.add("se-sel"); });
+		},
+		clearSelection: function () {
+			if ( !sel ) return;
+			list.querySelectorAll(".se-sel").forEach(function ( e ) { e.classList.remove("se-sel"); });
+			sel = null;
+		},
+		setCursor: function ( u, i, noscroll, keepSelection ) {
 			var d = SE.model.data(); if ( !d.us.length ) return;
 			u = Math.max(0, Math.min(d.us.length - 1, u)); i = Math.max(0, Math.min(Math.max(0, d.us[u].items.length - 1), i));
 			cur = { u: u, i: i };
+			if ( !keepSelection ) SE.view.clearSelection();
 			var old = list.querySelector(".se-cur"); if ( old ) old.classList.remove("se-cur");
 			var oldu = list.querySelector(".se-ucur"); if ( oldu ) oldu.classList.remove("se-ucur");
 			var e = itemEl(u, i), row = list.children[u];

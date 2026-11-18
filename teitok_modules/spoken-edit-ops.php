@@ -12,7 +12,7 @@
 	function se_op_table () {
 		return array("set_who" => true, "move_prev" => true, "move_next" => true, "split" => true, "merge" => true,
 			"detok" => true, "detok_who" => true, "tok" => true, "tok_who" => true, "number" => true, "accept" => true,
-			"edit" => false, "delete" => false, "insert" => false, "merge_words" => true,
+			"edit" => false, "delete" => false, "insert" => false, "merge_words" => true, "extract" => false,
 			"rename_speaker" => true, "set_role" => true, "set_name" => true, "merge_speakers" => true, "add_speaker" => true);
 	};
 
@@ -120,6 +120,60 @@
 		};
 		$new = se_u_raw($doc, $u, $tail, $trail, array("id" => se_new_id($uc)) + $tset);
 		return array(array($u->s, $u->e, se_u_raw($doc, $u, $head, $trail, $hset) . $ind . $new));
+	};
+
+	# Words out of an utterance into a new one (simultaneous speech: another speaker's words inside an utterance whose
+	# speaker goes on, also when the ASR has interwoven the words of the two). "idx" lists the items that move (any set,
+	# they need not be next to each other); i (and to) name a run instead. "who" is the speaker of the new utterance
+	# (default: the same). The new utterance keeps its words' times; where the words have none, it gets the stretch from
+	# its first to its last word by vowel groups (marked timing="estimated"); the utterance they leave keeps its span.
+	# Utterances are in order of start: the new one goes before the old one when it starts first (when the first word
+	# moves), else after it. The order of the document changes, so this is not one of the operations whose text is
+	# compared afterwards.
+	function se_op_extract ( $doc, $a ) {
+		list($k, $u) = se_find_u($doc, $a['u']);
+		list($items, $trail) = se_items($doc, $u);
+		if ( isset($a['idx']) && is_array($a['idx']) ) {
+			$idx = array_values(array_unique(array_map('intval', $a['idx']))); sort($idx);
+			foreach ( $idx as $x ) if ( $x < 0 || $x >= count($items) ) throw new Exception("no such item");
+		} else {
+			$i = se_item_index($items, $a); $j = isset($a['to']) ? (int)$a['to'] : $i;
+			if ( $j < $i || $j >= count($items) ) throw new Exception("no such item");
+			$idx = range($i, $j);
+		};
+		if ( !$idx ) throw new Exception("nothing is selected");
+		$moved = array(); $rest = array();
+		foreach ( $items as $n => $it ) { if ( in_array($n, $idx, true) ) $moved[] = $it; else $rest[] = $it; };
+		if ( !count(array_filter($moved, 'se_is_word')) ) throw new Exception("there is no word in the selection");
+		if ( !count(array_filter($rest, 'se_is_word')) ) throw new Exception("these are all the words of the utterance: change its speaker instead");
+		$moved[0]['lead'] = "";
+		if ( $idx[0] === 0 ) $rest[0]['lead'] = "";
+		$hset = se_u_times($u, $rest); $tset = se_u_times($u, $moved, true);
+		$first = $idx[0]; $last = $idx[count($idx) - 1];
+		list($ms, $me) = se_items_span($moved);
+		if ( $ms === null && $me === null && se_untimed_words($u, $items) && ($cs = se_estimate_cut($u, $items, $first)) !== null && ($ce = se_estimate_cut($u, $items, $last + 1)) !== null ) {
+			$hset = array();        # the speaker who goes on keeps the whole span
+			$tset = array("start" => sprintf("%.3f", $cs), "end" => sprintf("%.3f", $ce), "timing" => "estimated");
+		};
+		# which one starts first: the new one only when it has the earliest word (the first, or one earlier in time)
+		$ns = isset($tset['start']) && is_numeric($tset['start']) ? (float)$tset['start'] : null;
+		list($rs, $re) = se_items_span($rest);
+		$os = $hset ? ($rs !== null ? $rs : null) : (is_numeric($u->attrs['start'] ?? null) ? (float)$u->attrs['start'] : null);
+		if ( $ns !== null && $os !== null && abs($ns - $os) > 0.0005 ) $newfirst = $ns < $os;
+		else $newfirst = $idx[0] === 0;
+		$who = trim($a['who'] ?? "");
+		if ( $who !== "" ) {
+			$old = $u->attrs['who'] ?? "";
+			if ( substr($old, 0, 1) === "#" && substr($who, 0, 1) !== "#" ) $who = "#$who";
+			$tset['who'] = $who;
+		};
+		$uc = se_id_counter($doc, "u", "u-");
+		$raw = $doc['raw']; $b = $u->s;
+		while ( $b > 0 && strpos(" \t\r\n", $raw[$b - 1]) !== false ) $b--;
+		$ind = substr($raw, $b, $u->s - $b);
+		$new = se_u_raw($doc, $u, $moved, $trail, array("id" => se_new_id($uc)) + $tset);
+		$old = se_u_raw($doc, $u, $rest, $trail, $hset);
+		return array(array($u->s, $u->e, $newfirst ? $new . $ind . $old : $old . $ind . $new));
 	};
 
 	function se_op_merge ( $doc, $a ) {

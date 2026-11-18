@@ -4,16 +4,16 @@
 var SE = window.SE = window.SE || {};
 SE.palette = (function () {
 	var GROUPS = [
-		["Move", ["left", "right", "up", "down", "home", "end"]],
+		["Move", ["left", "right", "up", "down", "home", "end", "extendLeft", "extendRight"]],
 		["Utterance", ["split", "mergeNext", "mergePrev", "movePrev", "moveNext", "detok", "tokenize", "detokAll", "tokAll"]],
-		["Word", ["edit", "insertBefore", "insertAfter", "delete", "join"]],
+		["Word", ["edit", "insertBefore", "insertAfter", "delete", "join", "extract"]],
 		["Speaker", "speakers"],
 		["Audio", ["play", "playUtt", "stop", "adjust"], "audio"],
 		["Uncertain words", ["nextLow", "prevLow", "accept"], "conf"],
 		["File", ["undo", "redo", "save"]]
 	];
 	var SHORT = {
-		left: "‹ word", right: "word ›", up: "‹ utterance", down: "utterance ›", home: "first word", end: "last word",
+		left: "‹ word", right: "word ›", up: "‹ utterance", down: "utterance ›", home: "first word", end: "last word", extendLeft: "‹ select", extendRight: "select ›", extract: "extract to new utterance",
 		split: "split here", mergeNext: "merge with next", mergePrev: "merge with previous",
 		movePrev: "this word and before → previous", moveNext: "this word and after → next",
 		detok: "detokenize", tokenize: "tokenize", detokAll: "detokenize speaker", tokAll: "tokenize speaker",

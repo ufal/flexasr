@@ -42,3 +42,4 @@
 .se-cur { outline: 2px solid var(--se-sel); background: #dbe8ff; }
 .se-now { background: #ffe8a3; }
 .se-edit { font: inherit; border: 1px solid var(--se-sel); border-radius: 3px; padding: 0 2px; }
+.se-w.se-sel, .se-sel { background: #cfe3ff; box-shadow: 0 0 0 1px #8fb4ee; border-radius: 3px; }

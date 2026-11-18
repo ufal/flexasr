@@ -14,6 +14,27 @@
 		return max(1, (int)$n);
 	};
 
+	# Punctuation stands for a pause, whose length the text does not give: a sentence end is about a syllable and a half,
+	# a comma half a syllable or a little more (the usual figures: a syllable ~0.2 s, a pause at a sentence end 0.3-0.5 s)
+	function se_punct_weight ( $text ) {
+		$t = trim((string)$text);
+		if ( in_array($t, array(".", "?", "!", "…", "...", "。"), true) ) return 1.5;
+		if ( in_array($t, array(",", ";", ":", "—", "–"), true) ) return 0.6;
+		return 0;
+	};
+
+	# What an item takes of an utterance's time: array(share, seconds). A word: its vowel groups (a punctuation mark:
+	# the weight of the pause it stands for) as a share; a <pause> that says how long it is: those seconds, known.
+	function se_item_time ( $it ) {
+		if ( $it['k'] === "pause" ) {
+			$d = se_item_attr($it, "dur");
+			return array(0.0, is_numeric($d) && (float)$d > 0 ? (float)$d : 0.0);
+		};
+		if ( !se_is_word($it) ) return array(0.0, 0.0);
+		$p = se_punct_weight($it['text']);
+		return array($p > 0 ? $p : (float)se_vowel_weight($it['text']), 0.0);
+	};
+
 	# The weight of an item list: the vowel groups of its words
 	function se_items_weight ( $items ) {
 		$w = 0;
@@ -29,11 +50,19 @@
 		return $ws === null && $we === null;
 	};
 
-	# The time at the cut before item $i of an untimed utterance: its start plus its length times the share of the
-	# utterance's vowel groups that come before the cut. Null when there is nothing to go by.
+	# The time at the cut before item $i of an untimed utterance (i = the number of items: its end). The utterance's
+	# own length, less the pauses that say how long they are, is shared out by the weights before the cut; the pauses
+	# before the cut are added back. Every operation that moves a boundary takes its time from here. Null when there is
+	# nothing to go by.
 	function se_estimate_cut ( $u, $items, $i ) {
-		$total = se_items_weight($items);
-		if ( $total <= 0 ) return null;
-		$s = (float)$u->attrs['start']; $e = (float)$u->attrs['end'];
-		return $s + ($e - $s) * se_items_weight(array_slice($items, 0, $i)) / $total;
+		$s = (float)$u->attrs['start']; $len = (float)$u->attrs['end'] - $s;
+		$wt = 0.0; $pt = 0.0; $wb = 0.0; $pb = 0.0;
+		foreach ( $items as $n => $it ) {
+			list($w, $p) = se_item_time($it);
+			$wt += $w; $pt += $p;
+			if ( $n < $i ) { $wb += $w; $pb += $p; }
+		};
+		if ( $wt <= 0 ) return null;
+		if ( $pt >= $len ) { $pt = 0.0; $pb = 0.0; }      # the pauses do not fit in the utterance: leave them out
+		return $s + $pb + ($len - $pt) * $wb / $wt;
 	};

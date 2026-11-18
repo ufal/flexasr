@@ -1,13 +1,15 @@
 // spoken-edit: the keys. The table maps a key (with ctrl/meta written "mod+", shift written "shift+" for non-letters)
-// to the name of an action in SE.main.actions; help() lists them.
+// to the name of an action in SE.main.actions (the actions window, spoken-edit-palette.js, lists them).
 var SE = window.SE = window.SE || {};
 SE.keys = (function () {
 	var TABLE = [
 		["ArrowRight", "right", "next word"], ["ArrowLeft", "left", "previous word"],
 		["ArrowDown", "down", "next utterance"], ["ArrowUp", "up", "previous utterance"],
 		["PageUp", "home", "first word of the utterance"], ["PageDown", "end", "last word of the utterance"],
+		["shift+ArrowLeft", "extendLeft", "select a word to the left (shift-click: everything up to a word; ⌘/Ctrl-click: add or take out a word)"], ["shift+ArrowRight", "extendRight", "select a word to the right"],
 		["[", "movePrev", "move this word and everything before it to the previous utterance"],
 		["]", "moveNext", "move this word and everything after it to the next utterance"],
+		["x", "extract", "take the selected words (any combination) or this word out of the utterance into a new one: another speaker talking at the same time"],
 		["s", "split", "split the utterance before this word"],
 		["m", "mergeNext", "merge with the next utterance"], ["M", "mergePrev", "merge with the previous utterance"],
 		["1", "who1", "speaker 1 for this utterance (1–9 for the speakers in the list)"],
@@ -27,6 +29,7 @@ SE.keys = (function () {
 	function name ( ev ) {
 		var k = ev.key;
 		if ( /^[1-9]$/.test(k) && !(ev.ctrlKey || ev.metaKey) ) return "who:" + k;
+		if ( ev.shiftKey && /^Arrow(Left|Right)$/.test(k) && !(ev.ctrlKey || ev.metaKey) ) return "shift+" + k;
 		var mod = (ev.ctrlKey || ev.metaKey) ? "mod+" : "";
 		if ( mod ) return mod + (ev.shiftKey ? "shift+" : "") + k.toLowerCase();
 		return k;

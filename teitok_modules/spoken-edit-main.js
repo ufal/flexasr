@@ -90,10 +90,43 @@ SE.main = (function () {
 		}
 	}
 
+	function range ( x, y ) { var r = []; for ( var k = Math.min(x, y); k <= Math.max(x, y); k++ ) r.push(k); return r; }
+	// shift+arrow: the selection runs from where it started to one word further left or right (within the utterance)
+	function extend ( dir ) {
+		var c = SE.view.cursor(), sel = SE.view.selection(), n = curU().items.length;
+		var anchor = sel && sel.u === c.u ? sel.anchor : c.i, head = Math.max(0, Math.min(n - 1, c.i + dir));
+		SE.view.setCursor(c.u, head, false, true); SE.view.select(c.u, range(anchor, head), anchor);
+	}
+	// a click with shift (everything between the anchor and this word is added) or ⌘/Ctrl (this word is added or taken out)
+	function clickSelect ( u, i, shift ) {
+		var cc = SE.view.cursor(), sl = SE.view.selection(), same = sl && sl.u === u;
+		var base = same ? sl.set.slice() : [cc.i], anchor = same ? sl.anchor : cc.i, set;
+		if ( shift ) { set = base.slice(); range(anchor, i).forEach(function ( k ) { if ( set.indexOf(k) < 0 ) set.push(k); }); }
+		else { set = base.filter(function ( k ) { return k !== i; }); if ( set.length === base.length ) set.push(i); anchor = i; }
+		SE.view.setCursor(u, i, true, true);
+		if ( set.length ) SE.view.select(u, set, anchor); else SE.view.clearSelection();
+	}
+
 	var actions = {
 		right: function () { step(1); }, left: function () { step(-1); },
 		down: function () { var c = SE.view.cursor(); SE.view.setCursor(c.u + 1, 0); }, up: function () { var c = SE.view.cursor(); SE.view.setCursor(c.u - 1, 0); },
 		home: function () { SE.view.setCursor(SE.view.cursor().u, 0); }, end: function () { SE.view.setCursor(SE.view.cursor().u, 1e9); },
+		extendLeft: function () { extend(-1); }, extendRight: function () { extend(1); },
+		// words of another speaker inside this utterance (simultaneous speech) into an utterance of their own: the selected
+		// words, in any combination, or the word under the cursor; with two speakers it goes to the other one. The new
+		// utterance is placed by its start time (before this one when it holds the first word), so the cursor follows it
+		extract: function () {
+			var c = SE.view.cursor(), u = curU(), sel = SE.view.selection(), spk = data().speakers, who = "";
+			var idx = sel && sel.u === c.u ? sel.set : [c.i];
+			if ( spk.length === 2 ) who = spk[0].id === u.who ? spk[1].id : spk[0].id;
+			exec({ op: "extract", u: uid(), idx: idx, who: who }, function ( o, d ) {
+				var seen = {}; o.us.forEach(function ( x ) { seen[x.id] = 1; });
+				for ( var k = 0; k < d.us.length; k++ ) if ( !seen[d.us[k].id] ) return [k, 0];
+				return [c.u, 0];
+			}).then(function () {
+				if ( !who ) say("The new utterance has the same speaker: press 1–9 to change it.", "info");
+			}, function () {});
+		},
 		edit: function () { startEdit(); },
 		delete: function () { exec({ op: "delete", u: uid(), i: ci() }, function ( o, d, c ) { return d.us.length < o.us.length ? [Math.min(c.u, d.us.length - 1), 0] : [c.u, c.i]; }); },
 		insertBefore: function () { question("Insert before:", "", function ( t ) { if ( t.trim() ) exec({ op: "insert", u: uid(), i: ci(), text: t }); }); },
@@ -121,7 +154,7 @@ SE.main = (function () {
 			if ( SE.audio.playing() ) SE.audio.stop(); else { var c = SE.view.cursor(); SE.audio.playFrom(SE.view.timeOf(c.u, c.i) || 0); }
 		},
 		playUtt: function () { var u = curU(); if ( u && u.s !== null && SE.audio.available() ) SE.audio.playFrom(u.s, u.e); },
-		stop: function () { SE.audio.stop(); say(""); },
+		stop: function () { SE.audio.stop(); SE.view.clearSelection(); say(""); },
 		// the waveform editor (TEITOK's wavesurfer) opened at the word under the cursor: where the times of words and
 		// utterances are dragged into place; it edits the saved file, so the edits here have to be saved first
 		adjust: function () {
@@ -211,9 +244,13 @@ SE.main = (function () {
 				var t = ev.target.closest("[data-u]"); if ( !t ) return;
 				var u = parseInt(t.dataset.u, 10);
 				if ( t.dataset.act === "who" ) { SE.view.setCursor(u, 0); return; }
+				if ( t.dataset.i !== undefined && (ev.shiftKey || ev.metaKey || ev.ctrlKey) && u === SE.view.cursor().u ) {
+					clickSelect(u, parseInt(t.dataset.i, 10), ev.shiftKey); app.focus(); return;
+				}
 				if ( t.dataset.i !== undefined ) SE.view.setCursor(u, parseInt(t.dataset.i, 10), true);
 				app.focus();
 			});
+			list.addEventListener("mousedown", function ( ev ) { if ( ev.shiftKey || ev.metaKey || ev.ctrlKey ) ev.preventDefault(); });      // no text selection by the browser
 			list.addEventListener("dblclick", function ( ev ) {
 				var t = ev.target.closest("[data-i]"); if ( t ) { SE.view.setCursor(parseInt(t.dataset.u, 10), parseInt(t.dataset.i, 10), true); startEdit(); }
 			});
