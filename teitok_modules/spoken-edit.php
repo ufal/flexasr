@@ -10,7 +10,9 @@
 	// Settings (optional), in settings.xml: <spokenedit lowconf="0.7" media="Audio"/>
 	//   lowconf: the confidence under which a word is marked as uncertain; media: the folder of audio files
 
-	check_login(getset('flexasr/admin') ? 'admin' : 'user');     # any staff login, or only administrators with <flexasr admin="1"/> as for the flexasr page
+	// Settings (optional) <spokenedit public="1"/>: everybody (also without a login) gets the editor as a viewer: the same
+	// display, the keys for moving and playing, no editing. With a login, ?view=1 gives that view too.
+	if ( !getset('spokenedit/public') ) check_login(getset('flexasr/admin') ? 'admin' : 'user');     # any staff login, or only administrators with <flexasr admin="1"/> as for the flexasr page
 	require_once(__DIR__ . "/spoken-edit-io.php");
 	require_once(__DIR__ . "/spoken-edit-scripts.php");
 
@@ -32,7 +34,7 @@
 	if ( in_array($_GET['act'] ?? "", array("apply", "save")) ) {
 		$in = json_decode(file_get_contents("php://input"), true);
 		if ( !is_array($in) || !isset($in['ops']) || !is_array($in['ops']) ) se_json(array("error" => "bad request"), 400);
-		if ( $_GET['act'] == "save" && !$username ) se_json(array("error" => "not logged in"), 403);
+		if ( !$username ) se_json(array("error" => "not logged in"), 403);
 		try {
 			$raw = $_GET['act'] == "save" ? se_save($path, $in['ops'], $in['hash'] ?? "") : se_run($path, $in['ops'], $in['hash'] ?? "");
 			se_json(se_model($raw));
@@ -42,12 +44,13 @@
 	};
 
 	$model = se_model(file_get_contents($path));
+	$readonly = !$username || isset($_GET['view']);
 	$media = $model['media'];
 	if ( $media && !preg_match('#^(https?:)?//#', $media) && strpos($media, "/") === false ) $media = ($se['media'] ?? "Audio") . "/" . $media;
 	$cfg = array("cid" => $cid, "base" => "index.php?action=$action&cid=" . rawurlencode($cid), "audio" => $media,
 		"tid" => preg_replace('/[^A-Za-z0-9_.:-]/', "", (string)($_GET['tid'] ?? ($_GET['jmp'] ?? ($_GET['jump'] ?? "")))),
-		"lowconf" => (float)($se['lowconf'] ?? 0.7), "canwrite" => $username ? 1 : 0, "wave" => "index.php?action=wavesurfer&cid=" . rawurlencode($cid),
-		"waveedit" => $username ? "index.php?action=wavesurfer&act=edit&cid=" . rawurlencode(preg_match('/\.xml$/i', $cid) ? $cid : "$cid.xml") : "");
+		"lowconf" => (float)($se['lowconf'] ?? 0.7), "canwrite" => $readonly ? 0 : 1, "readonly" => $readonly ? 1 : 0, "wave" => "index.php?action=wavesurfer&cid=" . rawurlencode($cid),
+		"waveedit" => !$readonly ? "index.php?action=wavesurfer&act=edit&cid=" . rawurlencode(preg_match('/\.xml$/i', $cid) ? $cid : "$cid.xml") : "");
 	$cfgjson = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
 	$modeljson = json_encode($model, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE);
 

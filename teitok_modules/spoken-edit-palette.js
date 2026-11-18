@@ -75,14 +75,17 @@ SE.palette = (function () {
 		head.appendChild(el("span", "", "Actions and keys")); close.type = "button"; close.title = "close (?)"; close.tabIndex = -1;
 		close.addEventListener("click", function () { api.toggle(false); opts.focus(); }); head.appendChild(close); win.appendChild(head); drag(head);
 		body = el("div", "se-pal-body"); win.appendChild(body);
+		var VIEW = { left: 1, right: 1, up: 1, down: 1, home: 1, end: 1, play: 1, playUtt: 1, stop: 1, toggleConf: 1, nextLow: 1, prevLow: 1, fullscreen: 1 };
+		if ( opts.readonly ) speakerBox = el("div");
 		GROUPS.forEach(function ( g ) {
+			if ( opts.readonly && g[1] === "speakers" ) return;
 			if ( g[2] === "audio" && !opts.audio ) return;
 			if ( g[2] === "conf" && !opts.hasconf ) return;
 			var sec = el("div", "se-pal-group"); sec.appendChild(el("div", "se-pal-title", g[0]));
 			var row = el("div", "se-pal-row");
 			if ( g[1] === "speakers" ) { speakerBox = row; }
-			else g[1].forEach(function ( a ) { var b = actionButton(a); buttons[a] = b; row.appendChild(b); });
-			sec.appendChild(row); body.appendChild(sec);
+			else g[1].forEach(function ( a ) { if ( opts.readonly && !VIEW[a] ) return; var b = actionButton(a); buttons[a] = b; row.appendChild(b); });
+			if ( row.childNodes.length || g[1] === "speakers" ) { sec.appendChild(row); body.appendChild(sec); }
 		});
 		drawSpeakers();
 		document.body.appendChild(win);

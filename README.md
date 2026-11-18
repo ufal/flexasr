@@ -125,6 +125,17 @@ sudo perl teitok_modules/install-flexasr.pl --shared /var/www/html/teitok/shared
 for gated models with `FLEXASR_HOME` set to it. any staff login (not an SSO login) may use the module, and `admin="1"` limits it to administrators; a task can be stopped by whoever started it or by an administrator; `language` is the default language and `restricted="1"` offers
 restricted-licence models by default (for an academic corpus; the licence conditions are shown before a job starts).
 
+### The transcript editor (spoken-edit)
+
+`index.php?action=spoken-edit&cid=FILE` is a keyboard-driven editor for transcripts: utterances with speakers and timed
+words, uncertain words marked (when the transcription has confidences), audio playback from any word, split/merge/move of
+utterances, speaker changes, full screen (`f`), and a window with all actions and keys (`?`). Edits are saved as splices
+of the original XML, so everything else in the file stays byte-for-byte as it was.
+
+It is also a **viewer**: with `<spokenedit public="1"/>` in the project's `settings.xml`, everybody, with or without a login,
+gets the same display with the keys for moving, playing and full screen, and no editing. A logged-in user gets the viewer
+with `&view=1`. Without `public`, the page needs a staff login, as the flexasr page does.
+
 ## Adding a model or provider
 
 - A new model of a known family (e.g. another Whisper fine-tune in CTranslate2 format): an entry in

@@ -233,7 +233,7 @@ SE.main = (function () {
 			window.addEventListener("beforeunload", function ( ev ) { if ( SE.model.dirty() ) { ev.preventDefault(); ev.returnValue = ""; return ""; } });
 			bar = el("div", "se-bar"); msg = el("div", "se-msg"); ask = el("div", "se-ask"); ask.hidden = true; list = el("div", "se-list");
 			undoB = button("Undo", "Ctrl/⌘ Z", actions.undo); redoB = button("Redo", "Ctrl/⌘ Shift Z", actions.redo); saveB = button("Save", "Ctrl/⌘ S", actions.save);
-			bar.appendChild(undoB); bar.appendChild(redoB); bar.appendChild(saveB);
+			if ( !c.readonly ) { bar.appendChild(undoB); bar.appendChild(redoB); bar.appendChild(saveB); }
 			if ( c.audio ) {
 				bar.appendChild(el("span", "se-sep"));
 				bar.appendChild(button("▶ Play", "Space", actions.play));
@@ -253,7 +253,7 @@ SE.main = (function () {
 			var w = el("a", "", "waveform view"); w.href = c.wave; bar.appendChild(w);
 			if ( c.waveedit ) { var we = el("a", "", "adjust times"); we.href = c.waveedit; we.title = "the waveform editor: drag the boundaries of the words and utterances"; bar.appendChild(we); }
 			var palB = !SE.palette ? null : SE.palette.init({
-				run: function ( a ) { if ( !busy && actions[a] ) actions[a](); }, focus: function () { app.focus(); },
+				readonly: !!c.readonly, run: function ( a ) { if ( !busy && actions[a] ) actions[a](); }, focus: function () { app.focus(); },
 				speakers: function () { return data().speakers.map(function ( p ) { return p.id; }); }, audio: !!c.audio, hasconf: !!d.hasconf
 			});
 			if ( app.requestFullscreen || app.webkitRequestFullscreen ) {
@@ -267,7 +267,7 @@ SE.main = (function () {
 			if ( palB ) bar.appendChild(palB);      // without the palette script the keys still work
 			speakersBox = el("details", "se-speakers"); speakersBox.appendChild(el("summary", "", "Speakers"));
 			var spkBody = el("div"); speakersBox.appendChild(spkBody);
-			app.appendChild(bar); app.appendChild(msg); app.appendChild(ask); app.appendChild(speakersBox); app.appendChild(list);
+			app.appendChild(bar); app.appendChild(msg); app.appendChild(ask); if ( !c.readonly ) app.appendChild(speakersBox); app.appendChild(list);
 			var det = speakersBox; speakersBox = spkBody;
 			SE.view.init(app, c); SE.view.setList(list);
 			SE.audio.init(c.audio, function ( t, playing, err ) { if ( err ) say(err, "error"); SE.view.follow(playing ? t : null); });
@@ -282,11 +282,12 @@ SE.main = (function () {
 				app.focus();
 			});
 			list.addEventListener("mousedown", function ( ev ) { if ( ev.shiftKey || ev.metaKey || ev.ctrlKey ) ev.preventDefault(); });      // no text selection by the browser
-			list.addEventListener("dblclick", function ( ev ) {
+			if ( !c.readonly ) list.addEventListener("dblclick", function ( ev ) {
 				var t = ev.target.closest("[data-i]"); if ( t ) { SE.view.setCursor(parseInt(t.dataset.u, 10), parseInt(t.dataset.i, 10), true); startEdit(); }
 			});
 			var guarded = {};
-			Object.keys(actions).forEach(function ( k ) { guarded[k] = function ( ev ) { if ( !busy ) actions[k](ev); }; });
+			var VIEW = { left: 1, right: 1, up: 1, down: 1, home: 1, end: 1, play: 1, playUtt: 1, stop: 1, toggleConf: 1, nextLow: 1, prevLow: 1, fullscreen: 1, help: 1 };
+			Object.keys(actions).forEach(function ( k ) { if ( c.readonly && !VIEW[k] ) return; guarded[k] = function ( ev ) { if ( !busy ) actions[k](ev); }; });
 			SE.keys.bind(guarded);
 			setInterval(function () { fetch(cfg.base + "&act=ping", { credentials: "same-origin" }).catch(function () {}); }, 600000);
 			applyConf();
