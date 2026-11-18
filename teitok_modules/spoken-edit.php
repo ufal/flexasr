@@ -1,6 +1,7 @@
 <?php
 	// spoken-edit: a keyboard-driven correction editor for spoken transcripts (utterances with @who, timed tokens)
-	// index.php?action=spoken-edit&cid=FILE
+	// index.php?action=spoken-edit&cid=FILE[&tid=TOKEN]     (id= works as cid=; tid= opens at that word; jmp= and jump= are tid=, as
+	//   in the waveform view)
 	//   act=apply  POST {ops, hash}: the document as it would be with these operations, as JSON (nothing is written)
 	//   act=save   POST {ops, hash}: apply the operations and write the document (logged-in staff only)
 	//   act=ping   nothing: keeps the session alive while the editor is open
@@ -21,7 +22,8 @@
 	};
 
 	$se = getset('spokenedit', array());
-	$cid = $_GET['cid'] ?? "";
+	# the file: cid (TEITOK's id of an XML file, from the Cartas PS days), or id, which means the same here
+	$cid = $_GET['cid'] ?? ($_GET['id'] ?? "");
 	$path = se_path($cid);
 
 	if ( ($_GET['act'] ?? "") == "ping" ) se_json(array("user" => $username ? 1 : 0));
@@ -43,6 +45,7 @@
 	$media = $model['media'];
 	if ( $media && !preg_match('#^(https?:)?//#', $media) && strpos($media, "/") === false ) $media = ($se['media'] ?? "Audio") . "/" . $media;
 	$cfg = array("cid" => $cid, "base" => "index.php?action=$action&cid=" . rawurlencode($cid), "audio" => $media,
+		"tid" => preg_replace('/[^A-Za-z0-9_.:-]/', "", (string)($_GET['tid'] ?? ($_GET['jmp'] ?? ($_GET['jump'] ?? "")))),
 		"lowconf" => (float)($se['lowconf'] ?? 0.7), "canwrite" => $username ? 1 : 0, "wave" => "index.php?action=wavesurfer&cid=" . rawurlencode($cid),
 		"waveedit" => $username ? "index.php?action=wavesurfer&act=edit&cid=" . rawurlencode(preg_match('/\.xml$/i', $cid) ? $cid : "$cid.xml") : "");
 	$cfgjson = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);

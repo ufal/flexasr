@@ -81,6 +81,15 @@ SE.main = (function () {
 		exec({ op: op, who: w });
 	}
 
+	// open at a word (tid=) or, when the id is an utterance's, at its first word
+	function openAt ( id ) {
+		var us = data().us;
+		for ( var u = 0; u < us.length; u++ ) {
+			for ( var i = 0; i < us[u].items.length; i++ ) if ( us[u].items[i].id === id ) return SE.view.setCursor(u, i);      // (a third argument would mean: do not scroll)
+			if ( us[u].id === id ) return SE.view.setCursor(u, 0);
+		}
+	}
+
 	var actions = {
 		right: function () { step(1); }, left: function () { step(-1); },
 		down: function () { var c = SE.view.cursor(); SE.view.setCursor(c.u + 1, 0); }, up: function () { var c = SE.view.cursor(); SE.view.setCursor(c.u - 1, 0); },
@@ -120,7 +129,7 @@ SE.main = (function () {
 			if ( SE.model.dirty() ) return say("Save first (Ctrl/⌘ S), then adjust the times.", "info");
 			var u = curU(), c = SE.view.cursor(), it = u && u.items[c.i], id = it && it.id;
 			if ( !id && u ) { var f = u.items.filter(function ( x ) { return x.id; })[0]; id = f && f.id; }
-			window.location.href = cfg.waveedit + (id ? "&jmp=" + encodeURIComponent(id) : "");
+			window.location.href = cfg.waveedit + (id ? "&tid=" + encodeURIComponent(id) : "");
 		},
 		undo: function () { SE.model.undo().then(function () { SE.view.render(); refresh(); }, function ( e ) { say(e.message, "error"); }); },
 		redo: function () { SE.model.redo().then(function () { SE.view.render(); refresh(); }, function ( e ) { say(e.message, "error"); }); },
@@ -213,6 +222,7 @@ SE.main = (function () {
 			SE.keys.bind(guarded);
 			setInterval(function () { fetch(cfg.base + "&act=ping", { credentials: "same-origin" }).catch(function () {}); }, 600000);
 			SE.view.render(); SE.view.setCursor(0, 0, true); refresh(); app.focus();
+			if ( c.tid ) openAt(c.tid);
 			var low = SE.view.uncertainList(); if ( low.length ) say(low.length + " uncertain words: press c to go through them, least certain first.", "info");
 		}
 	};
