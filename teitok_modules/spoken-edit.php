@@ -10,9 +10,11 @@
 	// Settings (optional), in settings.xml: <spokenedit lowconf="0.7" media="Audio"/>
 	//   lowconf: the confidence under which a word is marked as uncertain; media: the folder of audio files
 
-	// Settings (optional) <spokenedit public="1"/>: everybody (also without a login) gets the editor as a viewer: the same
-	// display, the keys for moving and playing, no editing. With a login, ?view=1 gives that view too.
-	if ( !getset('spokenedit/public') ) check_login(getset('flexasr/admin') ? 'admin' : 'user');     # any staff login, or only administrators with <flexasr admin="1"/> as for the flexasr page
+	// Everybody, also without a login, gets the editor as a viewer: the same display, the keys for moving and playing, no
+	// editing. With a login the editor itself; ?view=1 gives staff the viewer too. <spokenedit public="0"/> in settings.xml
+	// asks for a login for the viewer as well.
+	# anybody not logged in is a viewer (unless public="0"); a login goes through the usual check, so that editing stays staff-only
+	if ( $username || (string)getset('spokenedit/public') === "0" ) check_login(getset('flexasr/admin') ? 'admin' : 'user');     # any staff login, or only administrators with <flexasr admin="1"/> as for the flexasr page
 	require_once(__DIR__ . "/spoken-edit-io.php");
 	require_once(__DIR__ . "/spoken-edit-scripts.php");
 

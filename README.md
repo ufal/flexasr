@@ -132,9 +132,9 @@ words, uncertain words marked (when the transcription has confidences), audio pl
 utterances, speaker changes, full screen (`f`), and a window with all actions and keys (`?`). Edits are saved as splices
 of the original XML, so everything else in the file stays byte-for-byte as it was.
 
-It is also a **viewer**: with `<spokenedit public="1"/>` in the project's `settings.xml`, everybody, with or without a login,
-gets the same display with the keys for moving, playing and full screen, and no editing. A logged-in user gets the viewer
-with `&view=1`. Without `public`, the page needs a staff login, as the flexasr page does.
+It is also a **viewer**: everybody, with or without a login, gets the same display with the keys for moving, playing and
+full screen, and no editing; staff get the editor, and the viewer with `&view=1`. `<spokenedit public="0"/>` in the
+project's `settings.xml` asks for a staff login for the viewer as well.
 
 ## Adding a model or provider
 
