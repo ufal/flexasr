@@ -35,6 +35,17 @@ before the first download and in `flexasr models`), and the TEI header of the ou
 whose licence differs from flexasr's own. For academic corpora this is normally no problem; check before
 any commercial use. Without it, verbatim mode falls back to Whisper and warns that fillers may be lost.
 
+Clean transcription in 25 European languages (Bulgarian, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish,
+French, German, Greek, Hungarian, Italian, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Russian,
+Slovak, Slovenian, Spanish, Swedish, Ukrainian) comes from NVIDIA's **Canary-1B-v2** and **Parakeet-TDT-0.6B-v3**
+(`pip install -e ".[onnx]"`: onnxruntime only, no PyTorch and no NeMo; CC-BY-4.0, so no restriction on the output).
+They give punctuated text without fillers or repetitions (mode `clean` only). Canary is the more accurate and the
+default; Parakeet is about four times faster (roughly 40 and 11 times real time on one CPU, int8 files, about 0.7 and
+1 GB) and takes its word times from its own tokens (an 80 ms grid: expect a few tenths of a second of looseness;
+`--model align=whisperx-wav2vec2` places them by forced alignment); Canary has no token times in onnx-asr, so the
+align stage times its words. The speech is cut at pauses of 1.5 s or more into chunks of at most 25 s (a pinned
+Silero VAD). For these languages they take the place of Whisper in clean mode; Whisper still covers everything else.
+
 The model entries live in the models repository shared with flexipipe
 ([ufal/flexipipe-models](https://github.com/ufal/flexipipe-models), `registries/asr/`), in the same
 format as flexipipe's registries. Language codes and names (`nl`, `nld`, `Dutch`, `Nederlands`) come from

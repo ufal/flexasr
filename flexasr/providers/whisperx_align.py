@@ -39,7 +39,7 @@ class WhisperXAlign(Aligner):
             for w, a in zip(u.words, aligned):
                 if a.get("start") is not None and a.get("end") is not None:
                     w.start, w.end = round(a["start"], 3), round(a["end"], 3)
-                    if a.get("score") is not None:
+                    if a.get("score") is not None and w.conf is None:       # the transcriber's own confidence, when it has one, stays
                         w.conf = round(float(a["score"]), 3)
 
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flexasr"
-version = "0.0.18"
+version = "0.0.19"
 description = "Modular ASR pipeline for TEITOK corpora: per-language routing, verbatim transcription, timed TEI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,6 +15,8 @@ dependencies = ["numpy"]
 [project.optional-dependencies]
 # Providers are optional: install what you need; `flexasr info` shows what is usable.
 whisper = ["faster-whisper>=1.1"]
+# NVIDIA Parakeet and Canary (25 European languages, Czech among them) on onnxruntime: no PyTorch, no NeMo; CC-BY-4.0 models.
+onnx = ["onnx-asr[cpu,hub]>=0.12"]
 pyannote = ["pyannote.audio>=4.0"]
 whisperx = ["whisperx>=3.4"]
 # Verbatim transcription. NOTE: the weights AND THEIR OUTPUTS are non-commercial research only (Nyra Health
@@ -24,7 +26,7 @@ crisperwhisper = ["crisperwhisper[transformers]>=2.0.3"]
 speaker = ["onnxruntime", "huggingface_hub"]
 audio = ["soundfile"]
 # Everything a server running the TEITOK module usually wants (pyannote needs `flexasr setup`).
-server = ["flexasr[whisper,whisperx,crisperwhisper,speaker,pyannote,audio]"]
+server = ["flexasr[whisper,onnx,whisperx,crisperwhisper,speaker,pyannote,audio]"]
 test = ["pytest"]
 
 [project.scripts]
