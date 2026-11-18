@@ -26,7 +26,7 @@ def _entry(e: catalog.Entry, why: list[str], device: Optional[str]) -> dict[str,
     why = _access(e, why)
     return {"id": e.id, "task": e.task, "provider": e.provider, "source": e.source, "licence": e.licence,
             "restricted": e.restricted, "licence_note": e.licence_note, "gated": e.gated,
-            "languages": e.languages, "modes": e.modes, "priority": e.priority, "note": e.note,
+            "languages": e.languages, "modes": e.modes, "priority": e.priority, "note": e.note, "warning": e.warning,
             "usable": not why, "why_not": why, "device": device if not why else None}
 
 

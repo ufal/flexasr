@@ -50,6 +50,7 @@ class Entry:
     options: dict[str, Any] = field(default_factory=dict)  # provider options for this model
     scores: list[dict[str, Any]] = field(default_factory=list)
     note: str = ""
+    warning: str = ""                         # short caution shown beside the model where it can be chosen
 
     def covers(self, lang: Optional[str]) -> bool:
         return "*" in self.languages or (lang is not None and lang in self.languages)

@@ -42,6 +42,44 @@
     {
       "task": "transcribe",
       "provider": "crisperwhisper",
+      "source": "hf:nyralabs/CrisperWhisper2.0_large",
+      "revision": "f4334f6e8193f2691212d49b20fa12d370e13896",
+      "licence": "LicenseRef-nyra-health-NC-Research-1.0",
+      "licence_verified": true,
+      "restricted": [
+        "noncommercial",
+        "outputs-noncommercial"
+      ],
+      "licence_note": "nyra health Non-Commercial Research License 1.0: the model weights and every output they generate are for non-commercial use only; commercial use needs a licence from nyra health GmbH. The inference package (crisperwhisper) is MIT.",
+      "languages": [
+        "eng",
+        "deu",
+        "spa",
+        "nld",
+        "fra",
+        "ita",
+        "pol",
+        "por",
+        "rus",
+        "swe"
+      ],
+      "modes": [
+        "verbatim",
+        "clean"
+      ],
+      "timestamps": "word",
+      "priority": 40,
+      "size_mb": 3093,
+      "devices": [
+        "cpu"
+      ],
+      "warning": "no GPU: about twice as slow as turbo, 3 GB of memory",
+      "id": "crisperwhisper2-large-cpu",
+      "note": "CrisperWhisper 2.0 large: verbatim transcription (fillers, repetitions, false starts, vocal events) or intended text, with word times from trained alignment heads. Evaluated on 10 languages (human-labelled sets for English and German, synthetic verbatim sets for the others). Needs the crisperwhisper package. This entry runs the large model on a CPU: slow (about twice as slow as turbo on the same CPU), so it is never chosen automatically; pick it by hand for the best accuracy when time does not matter."
+    },
+    {
+      "task": "transcribe",
+      "provider": "crisperwhisper",
       "source": "hf:nyralabs/CrisperWhisper2.0_turbo",
       "revision": "de0369c8a68025b7f6e86387b6eb5a3b369787c8",
       "licence": "LicenseRef-nyra-health-NC-Research-1.0",

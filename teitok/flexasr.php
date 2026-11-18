@@ -103,6 +103,7 @@ if ( $_GET['api'] == 'status' ) {
 			if ( $e['task'] == $task && !$e['usable'] ) $unusable[] = fa_h($e['id']).': '.fa_h(implode('; ', $e['why_not']));
 			if ( $e['task'] != $task || !$e['usable'] ) continue;
 			$flag = $e['restricted'] ? ' ['.implode(', ', $e['restricted']).']' : '';
+			if ( $e['warning'] ) $flag .= ' ⚠ '.$e['warning'];
 			$opts .= "<option value='".fa_h($e['id'])."'>".fa_h($e['id'].$flag)."</option>";
 			if ( $e['restricted'] && $e['licence_note'] ) $notices[$e['licence_note']][] = $e['id'];
 		};

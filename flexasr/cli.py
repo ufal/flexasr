@@ -148,6 +148,7 @@ def main(argv=None):
                 continue
             flags = [f for f in (("restricted: " + ",".join(e.restricted)) if e.restricted else "",
                                  "gated" if e.gated else "",
+                                 ("warning: " + e.warning) if e.warning else "",
                                  "" if e.licence_verified else "licence unverified") if f]
             print(f"{e.task:10} {e.id:26} {e.licence or '?':18} {','.join(e.languages):12} "
                   f"{','.join(e.modes):15} {'; '.join(flags)}")

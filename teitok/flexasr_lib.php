@@ -348,6 +348,13 @@ function fa_output_job($output) {
 	return null;
 }
 
+function fa_log_clean($text) {
+	$text = preg_replace('/^\$ .*\R?/m', '', (string)$text);          // the command line that older tasks wrote as the first line
+	// The log is shown to every user of the module: keep the progress, drop the server's directory structure.
+	// An absolute path becomes ".../last-part"; web addresses (https://...) are left alone.
+	return preg_replace('~(?<![:\w/.@+-])/(?:[\w.@+=,-]+/)+([\w.@+=,-]*)~u', '…/$1', $text);
+}
+
 function fa_log_tail($id, $bytes = 20000) {
 	$f = fa_jobdir()."/$id.log";
 	if ( !file_exists($f) ) return '';
@@ -356,7 +363,7 @@ function fa_log_tail($id, $bytes = 20000) {
 	if ( $size > $bytes ) fseek($fh, -$bytes, SEEK_END);
 	$txt = stream_get_contents($fh);
 	fclose($fh);
-	return $txt;
+	return fa_log_clean($txt);
 }
 
 function fa_run_args($job, $out) {
@@ -395,7 +402,7 @@ function fa_start($job) {
 		.'if [ $rc -eq 0 ]; then echo done > '.$q("$dir/$id.status").'; elif [ -e '.$q("$dir/$id.cancel").' ]; then echo cancelled > '.$q("$dir/$id.status").'; else echo failed > '.$q("$dir/$id.status").'; fi; '
 		.'rm -f '.$q(fa_lockfile($job['audio'])).' '.$q("$dir/$id.pid").' '.$q("$dir/$id.cancel");
 	$runner = 'sh -c '.$q($script).' > /dev/null 2>&1 &';
-	file_put_contents("$dir/$id.log", '$ '.fa_cmd(fa_run_args($job, $tmpout))."\n");
+	file_put_contents("$dir/$id.log", date('c')." task started\n");
 	shell_exec($runner);
 	return true;
 }
