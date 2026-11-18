@@ -28,11 +28,14 @@ SE.palette = (function () {
 	function load () { try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); if ( v ) pos = v; } catch ( e ) {} }
 	function store () { try { localStorage.setItem(KEY, JSON.stringify(pos)); } catch ( e ) {} }
 
-	function place () {      // inside the viewport, also after a resize or a smaller screen than last time
+	// inside the viewport, also after a resize, a smaller screen than last time or full screen on / off. While it is
+	// dragged (loose) it may go partly off the screen; when let go it snaps back so that all of it can be seen.
+	function place ( loose ) {
 		var w = win.offsetWidth || 300, h = win.offsetHeight || 200;
 		var x = pos.x === null ? Math.max(8, window.innerWidth - w - 24) : pos.x, y = pos.y === null ? 80 : pos.y;
-		x = Math.min(Math.max(0, x), Math.max(0, window.innerWidth - Math.min(w, 120)));
-		y = Math.min(Math.max(0, y), Math.max(0, window.innerHeight - 40));
+		var fw = loose ? Math.min(w, 120) : w, fh = loose ? 40 : h;
+		x = Math.min(Math.max(0, x), Math.max(0, window.innerWidth - fw));
+		y = Math.min(Math.max(0, y), Math.max(0, window.innerHeight - fh));
 		pos.x = x; pos.y = y;                  // what is kept is what is shown (never off the screen)
 		win.style.left = x + "px"; win.style.top = y + "px";
 	}
@@ -42,8 +45,8 @@ SE.palette = (function () {
 			if ( ev.target.closest("button") ) return;
 			var dx = ev.clientX - win.offsetLeft, dy = ev.clientY - win.offsetTop;
 			head.setPointerCapture(ev.pointerId); ev.preventDefault();
-			function move ( e ) { pos.x = e.clientX - dx; pos.y = e.clientY - dy; place(); }
-			function up () { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up); head.removeEventListener("pointercancel", up); store(); }
+			function move ( e ) { pos.x = e.clientX - dx; pos.y = e.clientY - dy; place(true); }
+			function up () { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up); head.removeEventListener("pointercancel", up); place(); store(); }
 			head.addEventListener("pointermove", move); head.addEventListener("pointerup", up); head.addEventListener("pointercancel", up);
 		});
 	}
@@ -94,7 +97,7 @@ SE.palette = (function () {
 
 	var api = {
 		// the window has to live inside the full screen element to be seen in full screen
-		mount: function ( parent ) { if ( win && win.parentNode !== parent ) parent.appendChild(win); },
+		mount: function ( parent ) { if ( win && win.parentNode !== parent ) { parent.appendChild(win); if ( !win.hidden ) place(); } },
 		// opts: { run(action), focus(), speakers() -> ids, audio, hasconf }; returns the icon button for the bar
 		init: function ( o ) {
 			opts = o; load(); build();
