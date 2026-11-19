@@ -90,9 +90,12 @@ def main(argv=None):
     ap.add_argument("-v", "--verbose", action="store_true")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("run", help="audio → TEITOK XML (or the intermediate JSON)")
-    p.add_argument("audio")
-    p.add_argument("-o", "--output", help="output file (.xml: TEITOK, .json: intermediate document)")
+    p = sub.add_parser("run", help="audio → TEITOK XML (or the intermediate JSON); a TEITOK transcript → the same file with word times")
+    p.add_argument("audio", help="the audio, or an existing TEITOK transcript (.xml) to add word times to")
+    p.add_argument("--audio", dest="audio_file", metavar="FILE",
+                   help="with a transcript: its audio (default: the media file named in its header)")
+    p.add_argument("-o", "--output", help="output file (.xml: TEITOK, .json: intermediate document); with a transcript "
+                                          "as input, the transcript with times (the input itself needs --force)")
     p.add_argument("--media-url", help="media url in the TEI header (default: Audio/<file name>)")
     p.add_argument("--force", action="store_true", help="replace the output file if it exists (never done by default: it may hold corrections)")
     _common(p)
@@ -211,11 +214,16 @@ def main(argv=None):
 
     if a.cmd == "write":
         doc = Doc.from_json(Path(a.doc).read_text(encoding="utf-8"))
-        teitok.write(doc, a.output, teitok.Encoding(media_url=a.media_url))
+        _write(doc, a.output, a.media_url)
         return 0
 
     s = _settings(a)
-    if a.cmd == "run":
+    if a.cmd == "run" and a.audio.lower().endswith(".xml"):
+        from .readers import teitok as transcript
+
+        doc = transcript.read(a.audio, a.audio_file)
+        doc = run(doc.audio.path, s, doc=doc)
+    elif a.cmd == "run":
         doc = run(a.audio, s)
     else:
         doc = Doc.from_json(Path(a.doc).read_text(encoding="utf-8"))
@@ -226,8 +234,17 @@ def main(argv=None):
     elif out.endswith(".json"):
         Path(out).write_text(doc.to_json(), encoding="utf-8")
     else:
-        teitok.write(doc, out, teitok.Encoding(media_url=getattr(a, "media_url", None)))
+        _write(doc, out, getattr(a, "media_url", None))
     return 0
+
+
+def _write(doc: Doc, out: str, media_url=None) -> None:
+    if doc.transcript:                   # an existing transcript: its times go back into a copy of it
+        from .writers import timeback
+
+        logging.getLogger("flexasr").info(timeback.summary(timeback.write(doc, out)))
+    else:
+        teitok.write(doc, out, teitok.Encoding(media_url=media_url))
 
 
 def run_cli():

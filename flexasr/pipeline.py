@@ -2,6 +2,12 @@
 
     diarize → transcribe → align → assign → encode (verbatim only) → write
 
+With an existing transcript as input (``readers/teitok.py``) the transcript wins and only gets times:
+
+    [diarize] → transcribe (ASR words kept apart) → match → align (only when asked) → [assign] → write-back
+
+diarize and assign run only for tokens without utterances or speakers.
+
 A stage reads and writes the Doc only, so any stage can be re-run, resumed from a saved Doc, or done
 outside flexasr (dev/RESHAPE-2026-10.md §3.0). The pipeline never names a model: ``catalog.choose``
 does, per language, mode and hardware, unless the user overrides a provider or model per stage.
@@ -26,6 +32,9 @@ from .providers.base import CONTRACTS, Context
 log = logging.getLogger("flexasr")
 
 ALL_STAGES = ("diarize", "transcribe", "align", "tokens", "assign", "encode")
+# An existing transcript: times, and utterances and speakers only where it has none (diarize and assign skip
+# themselves otherwise). dev/REALIGN.md
+TRANSCRIPT_STAGES = ("diarize", "transcribe", "match", "align", "assign")
 
 
 @dataclass
@@ -56,7 +65,8 @@ class Settings:
 def _provider(stage: str, s: Settings, doc: Doc, progress: Callable[[str], None] = log.info):
     """Choose and instantiate the provider for a model stage."""
     ch = catalog.choose(stage, doc.language, s.mode, allow_restricted=s.allow_restricted,
-                        provider=s.providers.get(stage), model=s.models.get(stage))
+                        provider=s.providers.get(stage), model=s.models.get(stage),
+                        word_times=stage == "transcribe" and doc.transcript is not None)
     for n in ch.notes:
         log.warning(n)
     e = ch.entry
@@ -108,7 +118,7 @@ def new_doc(path: str | Path, s: Settings) -> Doc:
     return Doc(audio=Audio(path=str(path)), language=langs.norm(s.language), mode=s.mode)
 
 
-def run(path: str | Path, s: Settings, stages: tuple[str, ...] = ALL_STAGES, doc: Optional[Doc] = None,
+def run(path: str | Path, s: Settings, stages: Optional[tuple[str, ...]] = None, doc: Optional[Doc] = None,
         progress: Callable[[str], None] = lambda m: log.info(m)) -> Doc:
     from .cache import setup as setup_cache
 
@@ -116,10 +126,12 @@ def run(path: str | Path, s: Settings, stages: tuple[str, ...] = ALL_STAGES, doc
     from .quiet import quiet
 
     quiet()                                  # the libraries' progress bars and repeated warnings stay out of the log
+    doc = doc or new_doc(path, s)
+    if stages is None:
+        stages = TRANSCRIPT_STAGES if doc.transcript else ALL_STAGES
     unknown = [st for st in stages if st not in STAGES]
     if unknown:
-        raise ValueError(f"unknown stage(s) {', '.join(unknown)} (stages: {', '.join(ALL_STAGES)})")
-    doc = doc or new_doc(path, s)
+        raise ValueError(f"unknown stage(s) {', '.join(unknown)} (stages: {', '.join(STAGES)})")
     if s.language:
         doc.language = langs.norm(s.language)
     doc.mode = s.mode

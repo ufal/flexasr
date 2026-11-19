@@ -141,8 +141,9 @@ def candidates(task: str, lang: Optional[str], mode: str, hw: Hardware, allow_re
 
 def choose(task: str, lang: Optional[str], mode: str = "clean", *, hw: Optional[Hardware] = None,
            allow_restricted: bool = False, provider: Optional[str] = None, model: Optional[str] = None,
-           entries: Optional[dict[str, Entry]] = None) -> Choice:
-    """The entry (and provider, device) to use for one stage. ``provider`` / ``model`` override."""
+           entries: Optional[dict[str, Entry]] = None, word_times: bool = False) -> Choice:
+    """The entry (and provider, device) to use for one stage. ``provider`` / ``model`` override.
+    ``word_times``: only entries that give word times (to time an existing transcript)."""
     hw = hw or detect()
     entries = entries if entries is not None else load()
     providers = all_providers()
@@ -155,6 +156,10 @@ def choose(task: str, lang: Optional[str], mode: str = "clean", *, hw: Optional[
         cands = [c for c in cands if c[1].provider == provider]
         if not cands:
             raise NoChoice(f"no catalog entry for provider {provider!r} and task {task}")
+    if word_times:
+        for _, e, _, _, why in cands:
+            if e.timestamps != "word":
+                why.append("gives no word times (needed to time a transcript)")
     for i, (rank, e, reg, av, why) in enumerate(cands):
         if why:
             continue

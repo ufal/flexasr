@@ -28,6 +28,8 @@ class Word:
     orig: Optional[str] = None          # the engine's own spelling, when the encoding changed it
     speaker: Optional[str] = None
     space_after: bool = True            # False: the next token follows without a space ("Bonjour" ".")
+    src: Optional[int] = None           # transcript input: the element this word came from (its index among the file's start tags)
+    timing: Optional[str] = None        # transcript input: "given" (times were in the file), "estimated" (from the text, not the audio)
 
 
 @dataclass
@@ -39,6 +41,11 @@ class Utterance:
     words: list[Word] = field(default_factory=list)
     text: Optional[str] = None          # engine text before word segmentation (kept for reference)
     overlap: bool = False               # overlaps speech of another speaker (marked for review)
+    src: Optional[int] = None           # transcript input: the <u> this came from (None: tokens outside any <u>)
+    parent: Optional[int] = None        # transcript input, tokens outside any <u>: the element they are in
+    parent_tag: Optional[str] = None    # its name (a <p> is a transcriber's utterance boundary)
+    new: bool = False                   # transcript input: a <u> the run adds (written around its tokens)
+    review: Optional[str] = None        # why a person should check it (e.g. "speaker": the speaker is uncertain)
 
 
 @dataclass
@@ -78,6 +85,14 @@ class Provenance:
 
 
 @dataclass
+class Transcript:
+    """An existing transcript the run adds times to (instead of producing fresh output)."""
+
+    path: str
+    sha256: str                          # of the file as read: write-back refuses a file that changed since
+
+
+@dataclass
 class Audio:
     path: str
     duration: Optional[float] = None
@@ -97,6 +112,8 @@ class Doc:
     provenance: list[Provenance] = field(default_factory=list)
     done: list[str] = field(default_factory=list)              # stages that ran, in order
     run: dict[str, Any] = field(default_factory=dict)          # how it was run: settings, date (for the header)
+    transcript: Optional[Transcript] = None                    # transcript input: the file times are added to
+    hypothesis: list[Utterance] = field(default_factory=list)  # transcript input: the ASR output, used for its times only
     schema: str = SCHEMA
 
     # -- serialisation ---------------------------------------------------------------------------
@@ -115,14 +132,13 @@ class Doc:
             turns=[Turn(**t) for t in d.get("turns", [])],
             turns_exclusive=[Turn(**t) for t in d.get("turns_exclusive", [])],
             speakers=[Speaker(**s) for s in d.get("speakers", [])],
-            utterances=[
-                Utterance(**{**u, "words": [Word(**w) for w in u.get("words", [])]})
-                for u in d.get("utterances", [])
-            ],
+            utterances=[_utterance(u) for u in d.get("utterances", [])],
             pauses=[Pause(**p) for p in d.get("pauses", [])],
             provenance=[Provenance(**p) for p in d.get("provenance", [])],
             done=list(d.get("done", [])),
             run=dict(d.get("run", {})),
+            transcript=Transcript(**d["transcript"]) if d.get("transcript") else None,
+            hypothesis=[_utterance(u) for u in d.get("hypothesis", [])],
         )
 
     # -- helpers ---------------------------------------------------------------------------------
@@ -132,3 +148,7 @@ class Doc:
 
     def speaker(self, sid: Optional[str]) -> Optional[Speaker]:
         return next((s for s in self.speakers if s.id == sid), None)
+
+
+def _utterance(u: dict) -> Utterance:
+    return Utterance(**{**u, "words": [Word(**w) for w in u.get("words", [])]})

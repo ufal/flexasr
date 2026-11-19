@@ -84,6 +84,44 @@ uses the next diarizer it can (and says so), down to treating the recording as o
 Downloaded models go to the library caches, or to one folder of your choice (e.g. a large external
 disk): `{"models_dir": "/path/to/models"}` in `~/.flexasr/config.json`.
 
+## Times for an existing transcript
+
+Give `run` a TEITOK transcript instead of audio, and it adds word times to that transcript rather than making a new
+one:
+
+```bash
+flexasr run interview.xml -o interview.timed.xml
+flexasr run interview.xml --audio tapes/interview.wav -o interview.xml --force    # in place
+```
+
+The audio is the media file named in the header (`recording/media/@url`, looked up next to the file and in the folders
+above it, as in a TEITOK project), or `--audio`. Models and options are chosen as for audio; only transcribers that give
+word times are used.
+
+The transcript wins: its text, tokens, utterances and speakers stay as they are, and everything else in the file stays
+byte for byte as it was. flexasr transcribes the audio, matches its words to the transcript's tokens (ignoring case,
+accents and punctuation, and bridging different tokenization such as *qu'est-ce* as one word or two), and gives each
+matched token the time of its match. A spoken token without a match (a word the model heard differently, a repetition
+it left out) gets a time estimated from its neighbours, marked `timing="estimated"`, and placed where someone is
+speaking (by the diarization, or else the energy of the audio), so the pauses between stay pauses; punctuation and bracketed events
+such as `(rires)` get none. `<u>`s without times get them from their tokens. Times already in the file are kept, and
+utterances that have times are matched only within them. The header's `encodingDesc/appInfo` records the model and
+how many times were estimated; the run reports untranscribed speech and utterances whose given times do not fit
+the audio.
+
+Tokens outside any `<u>` get new utterances. The recording is diarized (as many speakers as the header's
+`listPerson` names, unless `--speakers` says otherwise), each token gets the speaker of its time, speaker changes
+move to the nearest pause or sentence end, and a `<u who start end>` is put around each stretch of one speaker,
+without moving anything else. A transcriber's `<p>` counts as an utterance they heard: it gets one `<u>` with the
+speaker of most of it, split only where the speaker changes at a sentence end with a pause; a `<p>` where another
+speaker has a real share is marked `review="speaker"`. Utterances overlapping someone else's speech are marked
+`overlap="review"`. The speakers are `spk1`, `spk2`, …; `--speaker-map` gives them the ids of the header's persons
+(`{"SPEAKER_00": {"id": "Doc"}}`). A `<u>` without `who` gets the speaker of most of its tokens.
+
+Utterances with text but no `<tok>`s are left as they are: a speaker left untokenized throughout (an interviewer,
+say) is taken as intended, and the run names the other ones, which need tokenizing to get times. A transcript
+without any tokens is refused: tokenize it first (in TEITOK, or with xmltokenize).
+
 ## In TEITOK
 
 `teitok_modules/` holds a TEITOK module (`index.php?action=flexasr`). In it, project members can:

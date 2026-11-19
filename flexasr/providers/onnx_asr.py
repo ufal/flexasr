@@ -9,7 +9,13 @@ Long recordings are cut at long pauses into chunks of at most about 20 s (Silero
 decode at most 20-30 s at a time and do badly on short snippets: the VAD settings of onnx-asr's own default give
 segments of a second or less, with which a whole sentence can come out empty. Options (catalog entry or ``--opt``):
 ``quantization`` (default int8 on CPU: the same text at half the time; ``null`` for the full-precision files),
-``vad`` (the onnx-asr VAD options), ``onnx_model`` (the onnx-asr model name, from the catalog entry).
+``vad`` (the onnx-asr VAD options), ``onnx_model`` (the onnx-asr model name, from the catalog entry),
+``batch_size`` (VAD segments decoded together, default 1).
+
+Segments are decoded one at a time by default. onnx-asr pads the segments of a batch to the longest, and with
+Parakeet that changes the text of the shorter ones: on a 1974 tape (NURC) a batch of 8 gave 108 words for two
+minutes where one at a time gave about 270, and the same segment came out differently depending on its
+neighbours in the batch (once empty). On the CPU, batching gains little.
 """
 
 from __future__ import annotations
@@ -90,7 +96,8 @@ class OnnxAsr(Transcriber):
         if name.startswith("nemo-canary") and lang:
             kw["language"] = lang                   # Canary is told the language; Parakeet v3 finds it itself
         words, chunks = [], []
-        for seg in model.with_vad(vad, **vopts).with_timestamps().recognize(audio, sample_rate=sr, **kw):
+        batch = int(self.ctx.options.get("batch_size", 1))
+        for seg in model.with_vad(vad, batch_size=batch, **vopts).with_timestamps().recognize(audio, sample_rate=sr, **kw):
             if not seg.tokens:
                 continue
             w = words_from_tokens(seg.tokens, seg.timestamps, seg.logprobs, offset=seg.start, limit=seg.end)
